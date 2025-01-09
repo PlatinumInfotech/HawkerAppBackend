@@ -143,7 +143,7 @@ app.get('/vendor/:id', async (req, res) => {
         // Return the JSON result with vendor details
         res.json(result.rows[0].get_vendor_by_id);
     } catch (err) {
-        // console.error('Query error:', err.stack);
+        console.error('Query error:', err.stack);
         res.status(500).send({ message: 'Error executing query' });
     }
 });
