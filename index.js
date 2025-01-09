@@ -22,6 +22,13 @@ const pool = new Pool({
       },
 });
 
+app.get('/',async(req,res)=>{
+    try{
+        res.send("Hello world");
+    }catch(err){
+        res.status(500).json({ message: 'Internal server error' });
+    }
+})
 
 app.post('/login', async (req, res) => {
     const { mobile, password } = req.body;
