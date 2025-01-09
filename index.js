@@ -16,12 +16,19 @@ const pool = new Pool({
     max: 10,                      // Maximum number of connections in the pool
     idleTimeoutMillis: 30000,     // Close idle connections after 30 seconds
     connectionTimeoutMillis: 2000,
-    ssl:{
+    ssl: {
         rejectUnauthorized: false,
         // ca: fs.readFileSync('/path/to/server-certificates/root.crt').toString(),
-      },
+    },
 });
 
+// app.get('/',async(req,res)=>{
+//     try{
+//         res.send("Hello world");
+//     }catch(err){
+//         res.status(500).json({ message: 'Internal server error' });
+//     }
+// })
 
 app.post('/login', async (req, res) => {
     const { mobile, password } = req.body;
@@ -58,8 +65,8 @@ app.post('/login', async (req, res) => {
         // Define JWT secret key (should be stored in environment variables for security)
         const secretKey = process.env.JWT_SECRET || 'ABCD';
 
-         // Generate JWT token,
-         const token = jwt.sign(payload,secretKey);
+        // Generate JWT token,
+        const token = jwt.sign(payload, secretKey);
 
         // Send the success response with vendor details
         res.status(200).json({
@@ -73,10 +80,53 @@ app.post('/login', async (req, res) => {
         //     vendor: loginResponse.vendor
         // });
     } catch (err) {
-        console.error('Query error:', err.stack);
+        // console.error('Query error:', err.stack);
         res.status(500).json({ message: 'Error executing query' });
     }
 });
+
+//create vendors
+app.post('/vendors', async(req,res)=>{
+    const {name,email,mobile, address, password} = req.body;
+
+    try{
+        const result = await pool.query({
+            text:  'SELECT * FROM create_vendor($1,$2,$3,$4,$5)',
+            values: [name,email,mobile, address, password]
+        });
+        res.status(201).json({
+            statusCode: 201,
+            message: 'success',
+            data: result.rows[0],
+          });
+    }catch(err){
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server',
+            error: err.message,
+          });
+    }
+})
+
+// Get All Vendors
+app.get('/vendors', async (req, res) => {
+    try {
+      const result = await pool.query('SELECT * FROM get_all_vendors()');
+  
+      res.status(200).json({
+        statusCode: 200,
+        message: 'success',
+        data: result.rows,
+      });
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Failed to fetch vendors',
+        error: error.message,
+      });
+    }
+  });
 
 app.get('/vendor/:id', async (req, res) => {
     const vendorId = req.params.id;
@@ -84,7 +134,7 @@ app.get('/vendor/:id', async (req, res) => {
     try {
         // Query the function directly to get vendor details by ID
         const result = await pool.query('SELECT get_vendor_by_id($1)', [vendorId]);
-        
+
         // Check if result exists
         if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Vendor not found' });
@@ -98,6 +148,372 @@ app.get('/vendor/:id', async (req, res) => {
     }
 });
 
+// Update Vendor
+app.put('/vendors/:vendorId', async (req, res) => {
+    const vendorId = parseInt(req.params.vendorId);
+    const { name, email, mobile, address } = req.body;
+  
+    try {
+      const result = await pool.query({
+        text: 'SELECT * FROM update_vendor($1, $2, $3, $4, $5)',
+        values: [vendorId, name, email, mobile, address],
+      });
+  
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          statusCode: 404,
+          message: 'Vendor not found',
+        });
+      }
+  
+      res.status(200).json({
+        statusCode: 200,
+        message: 'Vendor updated successfully',
+        vendor: result.rows[0],
+      });
+    } catch (error) {
+      console.error('Error updating vendor:', error);
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Failed to update vendor',
+        error: error.message,
+      });
+    }
+  });
+
+// Delete Vendor
+app.delete('/vendors/:vendorId', async (req, res) => {
+    const vendorId = parseInt(req.params.vendorId);
+  
+    try {
+      const result = await pool.query({
+        text: 'SELECT * FROM delete_vendor($1)',
+        values: [vendorId],
+      });
+  
+      if (result.rows[0].message === 'Vendor not found') {
+        return res.status(404).json({
+          statusCode: 404,
+          message: 'Vendor not found',
+        });
+      }
+  
+      res.status(200).json({
+        statusCode: 200,
+        message: result.rows[0].message,
+        data: {
+          id: result.rows[0].deleted_vendor_id,
+          name: result.rows[0].deleted_vendor_name,
+        },
+      });
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Failed to delete vendor',
+        error: error.message,
+      });
+    }
+  });
+
+// app.post('/products', async (req, res) => {
+//     const { vendor_id, name, price_per_unit, unit } = req.body;
+
+//     // Validate input data
+//     if (!vendor_id || !name || !price_per_unit || !unit) {
+//       return res.status(400).json({
+//         statusCode: 400,
+//         message: 'Missing required fields: vendor_id, name, price_per_unit, or unit',
+//       });
+//     }
+
+//     try {
+//       // Call the PostgreSQL procedure to insert the product
+//       const result = await pool.query({
+//         name: 'create_product',
+//         text: 'CALL create_product($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+//         values: [
+//           vendor_id,
+//           name,
+//           price_per_unit,
+//           unit,
+//           null, // Placeholder for product_id (output)
+//           null, // Placeholder for product_vendor_id (output)
+//           null, // Placeholder for product_name (output)
+//           null, // Placeholder for product_price_per_unit (output)
+//           null, // Placeholder for product_unit (output)
+//           null, // Placeholder for product_created_at (output)
+//         ],
+//       });
+
+//       // Ensure result has a row
+//       if (result.rows.length === 0) {
+//         return res.status(500).json({
+//           statusCode: 500,
+//           message: 'Product creation failed, no data returned from database',
+//         });
+//       }
+
+//       // Extract the inserted product details from the result
+//       const {
+//         product_id,
+//         product_vendor_id,
+//         product_name,
+//         product_price_per_unit,
+//         product_unit,
+//         product_created_at,
+//       } = result.rows[0];
+
+//       // Return the created product data
+//       res.status(201).json({
+//         statusCode: 201,
+//         message: 'Product created successfully',
+//         product: {
+//           id: product_id,
+//           vendor_id: product_vendor_id,
+//           name: product_name,
+//           price_per_unit: product_price_per_unit,
+//           unit: product_unit,
+//           created_at: product_created_at,
+//         },
+//       });
+//     } catch (err) {
+//       console.error('Error adding product:', err.stack);
+//       res.status(500).json({
+//         statusCode: 500,
+//         message: 'Internal server error',
+//       });
+//     }
+//   });
+
+app.post('/products', async (req, res) => {
+    const { vendor_id, name, price_per_unit, unit } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM create_product_func($1, $2, $3, $4)',
+            values: [vendor_id, name, price_per_unit, unit],
+        });
+
+        res.status(201).json({
+            statusCode: 201,
+            message: 'Product created successfully',
+            product: result.rows[0],
+        });
+    } catch (error) {
+        console.error('Error creating product:', error);
+        res.status(500).json({ error: 'Failed to create product' });
+    }
+});
+
+app.get('/products', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM products');
+        if (result.rows.length === 0) {
+            return res.status(200).json({
+                statusCode: 200,
+                message: "No products found",
+                data: []
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: result.rows
+        });
+    } catch (err) {
+        // console.error('Error fetching products:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+})
+
+app.delete('/products/:productId', async (req, res) => {
+    const productId = parseInt(req.params.productId);
+    try {
+        const result = await pool.query({
+            text: 'SELECT *FROM delete_product($1)',
+            values: [productId]
+        })
+        res.status(200).json({
+            message: result.rows[0].message
+        })
+    } catch (error) {
+        //   console.error('Error deleting product:', error);
+        res.status(500).json({ error: 'Failed to delete product' });
+    }
+});
+
+app.put('/products/:productId', async (req, res) => {
+    const productId = parseInt(req.params.productId);
+    const { name, price_per_unit, unit } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM update_product($1, $2, $3, $4)',
+            values: [productId, name, price_per_unit, unit],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                message: 'Product not found'
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Product updated successfully',
+            product: result.rows[0]
+        });
+
+    } catch (error) {
+        // console.error('Error updating product:', error.stack); // Log the full error stack
+        res.status(500).json({ error: 'Failed to update product: ' + error.message });
+    }
+});
+
+
+// Create Employee
+app.post('/employees', async (req, res) => {
+    const { vendor_id, name, email, mobile, role, address, password } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM create_employee($1, $2, $3, $4, $5, $6, $7)',
+            values: [vendor_id, name, email, mobile, role, address, password], // Use lowercase 'values'
+        });
+
+        res.status(201).json({
+            statusCode: 201,
+            message: 'success',
+            data: result.rows[0], // Return the first row of the result
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to create employee',
+            error: err.message,
+        });
+    }
+});
+
+// Get Employee by ID
+app.get('/employees/:employeeId', async (req, res) => {
+    const employeeId = parseInt(req.params.employeeId);
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM get_employee_by_id($1)',
+            values: [employeeId],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Employee not found'
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error fetching employee:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to fetch employee',
+            error: error.message
+        });
+    }
+});
+
+// Get All Employees
+app.get('/employees', async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM get_all_employees()');
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows
+        });
+    } catch (error) {
+        console.error('Error fetching employees:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to fetch employees',
+            error: error.message
+        });
+    }
+});
+
+// Update Employee
+app.put('/employees/:employeeId', async (req, res) => {
+    const employeeId = parseInt(req.params.employeeId);
+    const { name, email, mobile, role, address } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6)',
+            values: [employeeId, name, email, mobile, role, address],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Employee not found'
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            employee: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Error updating employee:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to update employee',
+            error: error.message
+        });
+    }
+});
+
+//employee delete
+app.delete('/employees/:employeeId', async (req, res) => {
+    const employeeId = parseInt(req.params.employeeId);
+  
+    try {
+      const result = await pool.query({
+        text: 'SELECT * FROM delete_employee($1)',
+        values: [employeeId],
+      });
+  
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          statusCode: 404,
+          message: 'Employee not found',
+        });
+      }
+  
+      res.status(200).json({
+        statusCode: 200,
+        message: 'success',
+        data: result.rows[0] 
+      });
+    } catch (err) {
+      console.error('Error deleting employee:', err);
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Failed to delete employee',
+        error: err.message,
+      });
+    }
+  });
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
