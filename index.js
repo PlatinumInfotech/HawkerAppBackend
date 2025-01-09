@@ -1,5 +1,5 @@
-const express = require("express");
 const dotenv = require("dotenv").config();
+const express = require("express");
 const { Pool } = require('pg');
 const jwt = require("jsonwebtoken")
 
@@ -22,10 +22,10 @@ const pool = new Pool({
     },
 });
 
-app.get('/',async(req,res)=>{
-    try{
+app.get('/', async (req, res) => {
+    try {
         res.send("Hello world");
-    }catch(err){
+    } catch (err) {
         res.status(500).json({ message: 'Internal server error' });
     }
 })
@@ -86,47 +86,47 @@ app.post('/login', async (req, res) => {
 });
 
 //create vendors
-app.post('/vendors', async(req,res)=>{
-    const {name,email,mobile, address, password} = req.body;
+app.post('/vendors', async (req, res) => {
+    const { name, email, mobile, address, password } = req.body;
 
-    try{
+    try {
         const result = await pool.query({
-            text:  'SELECT * FROM create_vendor($1,$2,$3,$4,$5)',
-            values: [name,email,mobile, address, password]
+            text: 'SELECT * FROM create_vendor($1,$2,$3,$4,$5)',
+            values: [name, email, mobile, address, password]
         });
         res.status(201).json({
             statusCode: 201,
             message: 'success',
             data: result.rows[0],
-          });
-    }catch(err){
+        });
+    } catch (err) {
         res.status(500).json({
             statusCode: 500,
             message: 'Internal server',
             error: err.message,
-          });
+        });
     }
 })
 
 // Get All Vendors
 app.get('/vendors', async (req, res) => {
     try {
-      const result = await pool.query('SELECT * FROM get_all_vendors()');
-  
-      res.status(200).json({
-        statusCode: 200,
-        message: 'success',
-        data: result.rows,
-      });
+        const result = await pool.query('SELECT * FROM get_all_vendors()');
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows,
+        });
     } catch (error) {
-      console.error('Error fetching vendors:', error);
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Failed to fetch vendors',
-        error: error.message,
-      });
+        console.error('Error fetching vendors:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to fetch vendors',
+            error: error.message,
+        });
     }
-  });
+});
 
 app.get('/vendor/:id', async (req, res) => {
     const vendorId = req.params.id;
@@ -152,69 +152,69 @@ app.get('/vendor/:id', async (req, res) => {
 app.put('/vendors/:vendorId', async (req, res) => {
     const vendorId = parseInt(req.params.vendorId);
     const { name, email, mobile, address } = req.body;
-  
+
     try {
-      const result = await pool.query({
-        text: 'SELECT * FROM update_vendor($1, $2, $3, $4, $5)',
-        values: [vendorId, name, email, mobile, address],
-      });
-  
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          statusCode: 404,
-          message: 'Vendor not found',
+        const result = await pool.query({
+            text: 'SELECT * FROM update_vendor($1, $2, $3, $4, $5)',
+            values: [vendorId, name, email, mobile, address],
         });
-      }
-  
-      res.status(200).json({
-        statusCode: 200,
-        message: 'Vendor updated successfully',
-        vendor: result.rows[0],
-      });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Vendor not found',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Vendor updated successfully',
+            vendor: result.rows[0],
+        });
     } catch (error) {
-      console.error('Error updating vendor:', error);
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Failed to update vendor',
-        error: error.message,
-      });
+        console.error('Error updating vendor:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to update vendor',
+            error: error.message,
+        });
     }
-  });
+});
 
 // Delete Vendor
 app.delete('/vendors/:vendorId', async (req, res) => {
     const vendorId = parseInt(req.params.vendorId);
-  
+
     try {
-      const result = await pool.query({
-        text: 'SELECT * FROM delete_vendor($1)',
-        values: [vendorId],
-      });
-  
-      if (result.rows[0].message === 'Vendor not found') {
-        return res.status(404).json({
-          statusCode: 404,
-          message: 'Vendor not found',
+        const result = await pool.query({
+            text: 'SELECT * FROM delete_vendor($1)',
+            values: [vendorId],
         });
-      }
-  
-      res.status(200).json({
-        statusCode: 200,
-        message: result.rows[0].message,
-        data: {
-          id: result.rows[0].deleted_vendor_id,
-          name: result.rows[0].deleted_vendor_name,
-        },
-      });
+
+        if (result.rows[0].message === 'Vendor not found') {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Vendor not found',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: result.rows[0].message,
+            data: {
+                id: result.rows[0].deleted_vendor_id,
+                name: result.rows[0].deleted_vendor_name,
+            },
+        });
     } catch (error) {
-      console.error('Error deleting vendor:', error);
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Failed to delete vendor',
-        error: error.message,
-      });
+        console.error('Error deleting vendor:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to delete vendor',
+            error: error.message,
+        });
     }
-  });
+});
 
 // app.post('/products', async (req, res) => {
 //     const { vendor_id, name, price_per_unit, unit } = req.body;
@@ -286,6 +286,154 @@ app.delete('/vendors/:vendorId', async (req, res) => {
 //     }
 //   });
 
+//CUSTOMERS
+//add customer
+app.post('/vendors/:vendorId/customers', async (req, res) => {
+    const vendorId = parseInt(req.params.vendorId);
+    const { name, email, mobile, address } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM create_customer($1,$2,$3,$4,$5)',
+            values: [vendorId, name, email, mobile, address]
+        });
+        res.status(201).json({
+            statusCode: 201,
+            message: 'success',
+            data: result.rows[0],
+        });
+    } catch (err) {
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server',
+            error: err.message,
+        });
+    }
+})
+
+// Get Customer by ID
+app.get('/vendors/:vendorId/customers/:customerId', async (req, res) => {
+    const vendorId = parseInt(req.params.vendorId);
+    const customerId = parseInt(req.params.customerId);
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM get_customer_by_id($1)',
+            values: [customerId],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Customer not found',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            customer: result.rows[0],
+        });
+    } catch (error) {
+        console.error('Error fetching customer:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to fetch customer',
+            error: error.message,
+        });
+    }
+});
+
+// Get All Customers (for a specific vendor)
+app.get('/vendors/:vendorId/customers', async (req, res) => {
+    // Implement logic to get all customers for a specific vendor
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM customers WHERE vendor_id = $1',
+            values: [req.params.vendorId],
+        });
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows,
+        });
+    } catch (error) {
+        console.error('Error fetching customers:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to fetch customers',
+            error: error.message,
+        });
+    }
+});
+
+// Update Customer
+app.put('/vendors/:vendorId/customers/:customerId', async (req, res) => {
+    const customerId = parseInt(req.params.customerId);
+    const { name, email, mobile, address } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5)',
+            values: [customerId, name, email, mobile, address],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Customer not found',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Customer updated successfully',
+            customer: result.rows[0],
+        });
+    } catch (error) {
+        console.error('Error updating customer:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to update customer',
+            error: error.message,
+        });
+    }
+});
+
+// Delete Customer API
+app.delete('/vendors/customers/:customerId', async (req, res) => {
+    const customerId = parseInt(req.params.customerId);
+
+    try {
+        // Call the PostgreSQL function to delete the customer
+        const result = await pool.query({
+            text: 'SELECT * FROM delete_customer($1)',
+            values: [customerId]
+        });
+
+        // Return the result
+        res.status(200).json({
+            statusCode: 200,
+            message: result.rows[0].message,
+            data: {
+                deleted_customer_id: result.rows[0].deleted_customer_id,
+                deleted_customer_name: result.rows[0].deleted_customer_name
+            }
+        });
+    } catch (err) {
+        console.error('Error deleting customer:', err.stack);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
+        });
+    }
+});
+
+
+//PRODUCTS
+//add product
 app.post('/products', async (req, res) => {
     const { vendor_id, name, price_per_unit, unit } = req.body;
 
@@ -486,34 +634,34 @@ app.put('/employees/:employeeId', async (req, res) => {
 //employee delete
 app.delete('/employees/:employeeId', async (req, res) => {
     const employeeId = parseInt(req.params.employeeId);
-  
+
     try {
-      const result = await pool.query({
-        text: 'SELECT * FROM delete_employee($1)',
-        values: [employeeId],
-      });
-  
-      if (result.rows.length === 0) {
-        return res.status(404).json({
-          statusCode: 404,
-          message: 'Employee not found',
+        const result = await pool.query({
+            text: 'SELECT * FROM delete_employee($1)',
+            values: [employeeId],
         });
-      }
-  
-      res.status(200).json({
-        statusCode: 200,
-        message: 'success',
-        data: result.rows[0] 
-      });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Employee not found',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows[0]
+        });
     } catch (err) {
-      console.error('Error deleting employee:', err);
-      res.status(500).json({
-        statusCode: 500,
-        message: 'Failed to delete employee',
-        error: err.message,
-      });
+        console.error('Error deleting employee:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to delete employee',
+            error: err.message,
+        });
     }
-  });
+});
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
