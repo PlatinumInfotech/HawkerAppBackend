@@ -25,6 +25,11 @@ const pool = new Pool({
 app.get('/', async (req, res) => {
     try {
         res.send("Hello world");
+        console.log(process.env.HOST);
+            console.log(process.env.PORT);
+            console.log(process.env.USER);
+            console.log(process.env.PASSWORD);
+            console.log(process.env.DATABASE);
     } catch (err) {
         res.status(500).json({ message: 'Internal server error' });
     }
@@ -216,81 +221,11 @@ app.delete('/vendors/:vendorId', async (req, res) => {
     }
 });
 
-// app.post('/products', async (req, res) => {
-//     const { vendor_id, name, price_per_unit, unit } = req.body;
-
-//     // Validate input data
-//     if (!vendor_id || !name || !price_per_unit || !unit) {
-//       return res.status(400).json({
-//         statusCode: 400,
-//         message: 'Missing required fields: vendor_id, name, price_per_unit, or unit',
-//       });
-//     }
-
-//     try {
-//       // Call the PostgreSQL procedure to insert the product
-//       const result = await pool.query({
-//         name: 'create_product',
-//         text: 'CALL create_product($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-//         values: [
-//           vendor_id,
-//           name,
-//           price_per_unit,
-//           unit,
-//           null, // Placeholder for product_id (output)
-//           null, // Placeholder for product_vendor_id (output)
-//           null, // Placeholder for product_name (output)
-//           null, // Placeholder for product_price_per_unit (output)
-//           null, // Placeholder for product_unit (output)
-//           null, // Placeholder for product_created_at (output)
-//         ],
-//       });
-
-//       // Ensure result has a row
-//       if (result.rows.length === 0) {
-//         return res.status(500).json({
-//           statusCode: 500,
-//           message: 'Product creation failed, no data returned from database',
-//         });
-//       }
-
-//       // Extract the inserted product details from the result
-//       const {
-//         product_id,
-//         product_vendor_id,
-//         product_name,
-//         product_price_per_unit,
-//         product_unit,
-//         product_created_at,
-//       } = result.rows[0];
-
-//       // Return the created product data
-//       res.status(201).json({
-//         statusCode: 201,
-//         message: 'Product created successfully',
-//         product: {
-//           id: product_id,
-//           vendor_id: product_vendor_id,
-//           name: product_name,
-//           price_per_unit: product_price_per_unit,
-//           unit: product_unit,
-//           created_at: product_created_at,
-//         },
-//       });
-//     } catch (err) {
-//       console.error('Error adding product:', err.stack);
-//       res.status(500).json({
-//         statusCode: 500,
-//         message: 'Internal server error',
-//       });
-//     }
-//   });
-
 //CUSTOMERS
 //add customer
 app.post('/vendors/:vendorId/customers', async (req, res) => {
     const vendorId = parseInt(req.params.vendorId);
-    const { name, email, mobile, address } = req.body;
+    const { name, email, mobile, address  } = req.body;
 
     try {
         const result = await pool.query({
