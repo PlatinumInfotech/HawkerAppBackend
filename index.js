@@ -27,7 +27,7 @@ app.get('/', async (req, res) => {
         res.send("Hello world");
         console.log(process.env.HOST);
             console.log(process.env.PORT);
-            console.log(process.env.USER);
+            console.log(hawkeradmin);
             console.log(process.env.PASSWORD);
             console.log(process.env.DATABASE);
     } catch (err) {
