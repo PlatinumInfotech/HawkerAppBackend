@@ -222,29 +222,29 @@ app.delete('/vendors/:vendorId', async (req, res) => {
 });
 
 //CUSTOMERS
-//add customer
 app.post('/vendors/:vendorId/customers', async (req, res) => {
     const vendorId = parseInt(req.params.vendorId);
-    const { name, email, mobile, address  } = req.body;
+    const { name, email, mobile, address, status = 'active' } = req.body; // New field
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_customer($1,$2,$3,$4,$5)',
-            values: [vendorId, name, email, mobile, address]
+            text: 'SELECT * FROM create_customer($1, $2, $3, $4, $5, $6)',
+            values: [vendorId, name, email, mobile, address, status], // Automatically handles new fields
         });
         res.status(201).json({
             statusCode: 201,
-            message: 'success',
+            message: 'Customer created successfully',
             data: result.rows[0],
         });
     } catch (err) {
+        console.error('Error creating customer:', err.stack);
         res.status(500).json({
             statusCode: 500,
-            message: 'Internal server',
+            message: 'Internal server error',
             error: err.message,
         });
     }
-})
+});
 
 // Get Customer by ID
 app.get('/vendors/:vendorId/customers/:customerId', async (req, res) => {
@@ -512,6 +512,39 @@ app.get('/employees/:employeeId', async (req, res) => {
         });
     }
 });
+
+app.get('/vendors/:vendorId/employees', async (req, res) => {
+    const vendorId = parseInt(req.params.vendorId);
+  
+    try {
+      const result = await pool.query({
+        text: 'SELECT * FROM employees WHERE vendor_id = $1',
+        values: [vendorId],
+      });
+  
+      if (result.rows.length === 0) {
+        return res.status(200).json({ 
+          statusCode: 200, 
+          message: 'No employees found for this vendor', 
+          data: [] 
+        });
+      }
+  
+      res.status(200).json({
+        statusCode: 200,
+        message: 'Employees fetched successfully',
+        data: result.rows
+      });
+  
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      res.status(500).json({
+        statusCode: 500,
+        message: 'Failed to fetch employees',
+        error: error.message
+      });
+    }
+  });
 
 // Get All Employees
 app.get('/employees', async (req, res) => {
