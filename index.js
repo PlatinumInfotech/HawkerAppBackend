@@ -10,7 +10,7 @@ app.use(express.json());
 const pool = new Pool({
     host: process.env.HOST,
     port: process.env.PORT,
-    user: process.env.USERNAME,
+    user: process.env.USER,
     password: process.env.PASSWORD,
     database: process.env.DATABASE,
     max: 10,                      // Maximum number of connections in the pool
@@ -27,7 +27,7 @@ app.get('/', async (req, res) => {
         res.send("Hello world");
         console.log(process.env.HOST);
             console.log(process.env.PORT);
-            console.log(process.env.USERNAME);
+            console.log(process.env.USER);
             console.log(process.env.PASSWORD);
             console.log(process.env.DATABASE);
     } catch (err) {
@@ -458,12 +458,12 @@ app.put('/products/:productId', async (req, res) => {
 
 // Create Employee
 app.post('/employees', async (req, res) => {
-    const { vendor_id, name, email, mobile, role, address, password } = req.body;
+    const { vendor_id, name, email, mobile, role, address } = req.body;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_employee($1, $2, $3, $4, $5, $6, $7)',
-            values: [vendor_id, name, email, mobile, role, address, password], // Use lowercase 'values'
+            text: 'SELECT * FROM create_employee($1, $2, $3, $4, $5, $6)',
+            values: [vendor_id, name, email, mobile, role, address], // Use lowercase 'values'
         });
 
         res.status(201).json({
