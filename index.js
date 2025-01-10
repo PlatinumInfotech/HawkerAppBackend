@@ -10,7 +10,7 @@ app.use(express.json());
 const pool = new Pool({
     host: process.env.HOST,
     port: process.env.PORT,
-    user: process.env.USER,
+    user: process.env.USERNAME,
     password: process.env.PASSWORD,
     database: process.env.DATABASE,
     max: 10,                      // Maximum number of connections in the pool
@@ -27,7 +27,7 @@ app.get('/', async (req, res) => {
         res.send("Hello world");
         console.log(process.env.HOST);
             console.log(process.env.PORT);
-            console.log(process.env.USER);
+            console.log(process.env.USERNAME);
             console.log(process.env.PASSWORD);
             console.log(process.env.DATABASE);
     } catch (err) {
