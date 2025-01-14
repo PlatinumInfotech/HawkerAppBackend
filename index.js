@@ -36,18 +36,21 @@ app.get('/', async (req, res) => {
 })
 
 app.post('/login', async (req, res) => {
-    const { mobile, password } = req.body;
+    const { mobile, userType } = req.body;
 
-    // Ensure mobile and password are provided
-    if (!mobile || !password) {
-        return res.status(400).json({ message: 'mobile and password are required' });
+    // Validate input
+    if (!mobile || !userType) {
+        return res.status(400).json({
+            status_code: 400,
+            message: 'Mobile number and user type are required',
+        });
     }
 
     try {
-        // Call the PostgreSQL function to validate the vendor
+        // Call the PostgreSQL function to validate the user
         const result = await pool.query(
-            'SELECT validate_vendor($1, $2) AS response',
-            [mobile, password]
+            'SELECT validate_user($1, $2) AS response',
+            [mobile, userType]
         );
 
         // Extract the JSON response from the result
@@ -55,40 +58,58 @@ app.post('/login', async (req, res) => {
 
         // Check the status from the response
         if (loginResponse.status === 'error') {
-            return res.status(401).json({ message: loginResponse.message });
+            let errorMessage = 'User not found';
+            if (userType === 'vendor') {
+                errorMessage = 'Vendor not found. Please sign up.';
+            } else if (userType === 'employee') {
+                errorMessage = 'Employee not found. Please contact your vendor for login.';
+            } else if (userType === 'customer') {
+                errorMessage = 'Customer not found. Please contact your vendor or their staff for login.';
+            }
+
+            return res.status(404).json({
+                status_code: 404,
+                message: errorMessage,
+            });
         }
 
-        const vendor = loginResponse.vendor
+        // User details from the response
+        const user = loginResponse.user;
+
+        // Conditionally remove the connected_vendors field for vendors
+        if (userType === 'vendor' && !user.connected_vendors) {
+            delete user.connected_vendors;
+        }
 
         // Create JWT token
         const payload = {
-            id: vendor.id,
-            mobile: vendor.mobile,
-            name: vendor.name
-        }
+            id: user.id,
+            mobile: user.mobile,
+            name: user.name,
+            userType: userType,
+            connectedVendors: user.connected_vendors || [],
+        };
 
-        // Define JWT secret key (should be stored in environment variables for security)
         const secretKey = process.env.JWT_SECRET || 'ABCD';
+        const token = jwt.sign(payload, secretKey, { expiresIn: '1d' });
 
-        // Generate JWT token,
-        const token = jwt.sign(payload, secretKey);
-
-        // Send the success response with vendor details
-        res.status(200).json({
-            statusCode: 200,
+        // Send success response with token
+        return res.status(200).json({
+            status_code: 200,
             message: loginResponse.message,
-            vendor: vendor,
-            token: token
-        })
-        // res.json({
-        //     message: loginResponse.message,
-        //     vendor: loginResponse.vendor
-        // });
+            user,
+            token,
+        });
     } catch (err) {
-        // console.error('Query error:', err.stack);
-        res.status(500).json({ message: 'Error executing query' });
+        console.error('Query error:', err.stack);
+        return res.status(500).json({
+            status_code: 500,
+            message: 'Error executing query',
+        });
     }
 });
+
+
 
 //create vendors
 app.post('/vendors', async (req, res) => {
