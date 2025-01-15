@@ -35,6 +35,44 @@ app.get('/', async (req, res) => {
     }
 })
 
+const verifyToken = (allowedRoles) => {
+    return (req, res, next) => {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader) {
+            return res.status(401).json({
+                status_code: 401,
+                message: 'Access denied. No token provided.',
+            });
+        }
+
+        const token = authHeader.replace('Bearer ', '');
+        try {
+            const secretKey = process.env.JWT_SECRET || 'ABCD';
+            const decoded = jwt.verify(token, secretKey);
+
+            // Attach the decoded token payload to the request object
+            req.user = decoded;
+
+            // Check if the user's role is allowed
+            if (!allowedRoles.includes(decoded.userType)) {
+                return res.status(403).json({
+                    status_code: 403,
+                    message: 'Access denied. You do not have permission to perform this action.',
+                });
+            }
+
+            // Proceed to the next middleware or route handler
+            next();
+        } catch (err) {
+            return res.status(401).json({
+                status_code: 401,
+                message: 'Invalid or expired token.',
+            });
+        }
+    };
+};
+
 app.post('/login', async (req, res) => {
     const { mobile, userType } = req.body;
 
@@ -478,8 +516,10 @@ app.put('/products/:productId', async (req, res) => {
 
 
 // Create Employee
-app.post('/employees', async (req, res) => {
-    const { vendor_id, name, email, mobile, role, address } = req.body;
+app.post('/employees',verifyToken(['vendor']), async (req, res) => {
+    const { name, email, mobile, role, address } = req.body;
+
+    const vendor_id = req.user.id;
 
     try {
         const result = await pool.query({
@@ -588,14 +628,14 @@ app.get('/employees', async (req, res) => {
 });
 
 // Update Employee
-app.put('/employees/:employeeId', async (req, res) => {
+app.put('/employees/:employeeId',verifyToken(['vendor']), async (req, res) => {
     const employeeId = parseInt(req.params.employeeId);
     const { name, email, mobile, role, address } = req.body;
-
+    const updated_by = req.user.id
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6)',
-            values: [employeeId, name, email, mobile, role, address],
+            text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6, $7)',
+            values: [employeeId, name, email, mobile, role, address, updated_by],
         });
 
         if (result.rows.length === 0) {
@@ -648,6 +688,40 @@ app.delete('/employees/:employeeId', async (req, res) => {
             statusCode: 500,
             message: 'Failed to delete employee',
             error: err.message,
+        });
+    }
+});
+
+//Sales apis start
+app.post('/sales', verifyToken(['vendor','employee']), async (req, res) => {
+    const { customer_id, product_id, quantity, price_per_unit, total_amount } = req.body;
+    const vendor_id = req.user.id; // Extract vendor_id from token
+    const created_by = req.user.id;       // Extract user ID from token
+    console.log(req.user)
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7)',
+            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, created_by],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({
+                statusCode: 400,
+                message: 'Failed to insert sales data',
+            });
+        }
+
+        res.status(201).json({
+            statusCode: 201,
+            message: 'Sales data inserted successfully',
+            sale: result.rows[0], // Return the inserted sale
+        });
+    } catch (error) {
+        console.error('Error inserting sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to insert sales data',
+            error: error.message,
         });
     }
 });
