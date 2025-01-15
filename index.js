@@ -726,6 +726,63 @@ app.post('/sales', verifyToken(['vendor','employee']), async (req, res) => {
     }
 });
 
+app.get('/sales/customer/:customerId', verifyToken(['vendor', 'employee']), async (req, res) => {
+    const customerId = parseInt(req.params.customerId, 10);
+    const vendorId = req.user.id; // Extract vendor_id from the token
+
+    try {
+        const result = await pool.query({
+            text: `
+                SELECT 
+                    s.id AS sale_id,
+                    s.vendor_id,
+                    s.customer_id,
+                    c.name AS customer_name,
+                    c.mobile AS customer_mobile,
+                    s.product_id,
+                    p.name AS product_name,
+                    s.quantity,
+                    s.price_per_unit,
+                    s.total_amount,
+                    s.created_at,
+                    s.created_by
+                FROM 
+                    sales s
+                JOIN 
+                    customers c ON s.customer_id = c.id
+                JOIN 
+                    products p ON s.product_id = p.id
+                WHERE 
+                    s.customer_id = $1 AND s.vendor_id = $2
+                ORDER BY 
+                    s.created_at DESC
+            `,
+            values: [customerId, vendorId],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'No sales data found for this customer',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Sales data retrieved successfully',
+            sales: result.rows, // Return sales data with customer and product details
+        });
+    } catch (error) {
+        console.error('Error retrieving sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to retrieve sales data',
+            error: error.message,
+        });
+    }
+});
+
+
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
     console.log("Shutting down the server...");
