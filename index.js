@@ -726,9 +726,10 @@ app.post('/sales', verifyToken(['vendor','employee']), async (req, res) => {
     }
 });
 
-app.get('/sales/customer/:customerId', verifyToken(['vendor', 'employee']), async (req, res) => {
-    const customerId = parseInt(req.params.customerId, 10);
-    const vendorId = req.user.id; // Extract vendor_id from the token
+app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), async (req, res) => {
+    // const customerId = parseInt(req.params.customerId, 10);
+    // const vendorId = req.user.id; // Extract vendor_id from the token
+    const { vendorId, customerId, month, year, } = req.body;
 
     try {
         const result = await pool.query({
@@ -754,10 +755,12 @@ app.get('/sales/customer/:customerId', verifyToken(['vendor', 'employee']), asyn
                     products p ON s.product_id = p.id
                 WHERE 
                     s.customer_id = $1 AND s.vendor_id = $2
+                    AND EXTRACT(MONTH FROM s.created_at) = $3
+                    AND EXTRACT(YEAR FROM s.created_at) = $4
                 ORDER BY 
                     s.created_at DESC
             `,
-            values: [customerId, vendorId],
+            values: [customerId, vendorId, month, year],
         });
 
         if (result.rows.length === 0) {
