@@ -42,7 +42,7 @@ const verifyToken = (allowedRoles) => {
         if (!authHeader) {
             return res.status(401).json({
                 status_code: 401,
-                message: 'Access denied. No token provided.',
+                message: 'Access denied. No token provided.'
             });
         }
 
@@ -470,6 +470,42 @@ app.get('/products', async (req, res) => {
     }
 })
 
+app.get('/productByVendor', verifyToken(['vendor']), async (req, res) => {
+    try {
+        // Extract vendor_id from the token
+        const vendorId = parseInt(req.user.id);
+        // console.log(vendorId)
+
+        // Call the PostgreSQL function with the vendor_id
+        const result = await pool.query({
+            text: 'SELECT * FROM get_products_by_vendor($1)',
+            values: [vendorId],
+        });
+
+        // Check if any products were found
+        if (result.rows.length === 0) {
+            return res.status(200).json({
+                statusCode: 200,
+                message: "No products found for this vendor",
+                data: [],
+            });
+        }
+
+        // Respond with the retrieved products
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: result.rows,
+        });
+    } catch (err) {
+        console.error('Error fetching products:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+        });
+    }
+});
+
 app.delete('/products/:productId', async (req, res) => {
     const productId = parseInt(req.params.productId);
     try {
@@ -486,31 +522,45 @@ app.delete('/products/:productId', async (req, res) => {
     }
 });
 
-app.put('/products/:productId', async (req, res) => {
-    const productId = parseInt(req.params.productId);
+app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
+    const productId = parseInt(req.params.productId, 10);
     const { name, price_per_unit, unit } = req.body;
 
     try {
+        // Extract vendor_id from the token
+        const vendorId = parseInt(req.user.id, 10);
+
+        if (isNaN(productId) || isNaN(vendorId)) {
+            return res.status(400).json({
+                statusCode: 400,
+                message: 'Invalid product ID or vendor ID',
+            });
+        }
+
+        // Call the PostgreSQL function to update the product
         const result = await pool.query({
-            text: 'SELECT * FROM update_product($1, $2, $3, $4)',
-            values: [productId, name, price_per_unit, unit],
+            text: 'SELECT * FROM update_product($1, $2, $3, $4, $5)',
+            values: [vendorId, productId, name, price_per_unit, unit],
         });
 
         if (result.rows.length === 0) {
             return res.status(404).json({
-                message: 'Product not found'
+                statusCode: 404,
+                message: 'Product not found or you are not authorized to update this product',
             });
         }
 
         res.status(200).json({
             statusCode: 200,
             message: 'Product updated successfully',
-            product: result.rows[0]
+            product: result.rows[0],
         });
-
     } catch (error) {
-        // console.error('Error updating product:', error.stack); // Log the full error stack
-        res.status(500).json({ error: 'Failed to update product: ' + error.message });
+        console.error('Error updating product:', error.stack); // Log the full error stack
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to update product: ' + error.message,
+        });
     }
 });
 
