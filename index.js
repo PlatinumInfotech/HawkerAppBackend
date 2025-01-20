@@ -529,6 +529,7 @@ app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
     try {
         // Extract vendor_id from the token
         const vendorId = parseInt(req.user.id, 10);
+        const updated_by = parseInt(req.user.id, 10);
 
         if (isNaN(productId) || isNaN(vendorId)) {
             return res.status(400).json({
@@ -539,8 +540,8 @@ app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
 
         // Call the PostgreSQL function to update the product
         const result = await pool.query({
-            text: 'SELECT * FROM update_product($1, $2, $3, $4, $5)',
-            values: [vendorId, productId, name, price_per_unit, unit],
+            text: 'SELECT * FROM update_product($1, $2, $3, $4, $5, $6)',
+            values: [vendorId, productId, name, price_per_unit, unit, updated_by],
         });
 
         if (result.rows.length === 0) {
