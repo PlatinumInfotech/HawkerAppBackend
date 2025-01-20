@@ -282,7 +282,7 @@ app.delete('/vendors/:vendorId', async (req, res) => {
 
 //CUSTOMERS
 app.post('/vendors/:vendorId/customers', async (req, res) => {
-    const vendorId = parseInt(req.params.vendorId);
+    const vendorId = parseInt(req.user.vendorId);
     const { name, email, mobile, address, status = 'active' } = req.body; // New field
 
     try {
@@ -339,7 +339,7 @@ app.get('/vendors/:vendorId/customers/:customerId', async (req, res) => {
 });
 
 // Get All Customers (for a specific vendor)
-app.get('/vendors/:vendorId/customers', async (req, res) => {
+app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async (req, res) => {
     // Implement logic to get all customers for a specific vendor
     try {
         const result = await pool.query({
@@ -361,6 +361,48 @@ app.get('/vendors/:vendorId/customers', async (req, res) => {
         });
     }
 });
+
+// app.get('/vendor/:vendorId/customers',verifyToken(['vendor','employee']), async (req, res) => {
+//     const vendorId = parseInt(req.params.vendorId || req.user.id);
+
+//     try {
+//         if (isNaN(vendorId)) {
+//             return res.status(400).json({
+//                 statusCode: 400,
+//                 message: 'Invalid vendor ID',
+//             });
+//         }
+
+//         // Fetch customer data for the given vendorId
+//         const result = await pool.query({
+//             text: 'SELECT * FROM get_customer_list($1)',
+//             values: [vendorId], // Only pass vendorId as a parameter
+//         });
+
+//         if (result.rows.length === 0) {
+//             return res.status(404).json({
+//                 statusCode: 404,
+//                 message: 'No customers found for this vendor',
+//                 data: [],
+//             });
+//         }
+
+//         // Return the fetched customer data
+//         res.status(200).json({
+//             statusCode: 200,
+//             message: 'Customers retrieved successfully',
+//             data: result.rows, // Return the full result set
+//         });
+//     } catch (err) {
+//         console.error('Error fetching customer data:', err.stack);
+//         res.status(500).json({
+//             statusCode: 500,
+//             message: 'Internal server error',
+//             error: err.message,
+//         });
+//     }
+// });
+
 
 // Update Customer
 app.put('/vendors/:vendorId/customers/:customerId', async (req, res) => {
@@ -428,8 +470,9 @@ app.delete('/vendors/customers/:customerId', async (req, res) => {
 
 //PRODUCTS
 //add product
-app.post('/products', async (req, res) => {
-    const { vendor_id, name, price_per_unit, unit } = req.body;
+app.post('/products', verifyToken(['vendor']), async (req, res) => {
+    const vendor_id = req.user.id;
+    const { name, price_per_unit, unit } = req.body;
 
     try {
         const result = await pool.query({
