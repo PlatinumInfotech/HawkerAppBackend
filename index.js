@@ -725,10 +725,11 @@ app.get('/employees', async (req, res) => {
 });
 
 // Update Employee
-app.put('/employees/:employeeId',verifyToken(['vendor']), async (req, res) => {
-    const employeeId = parseInt(req.params.employeeId);
+app.put('/employees/:employeeId', verifyToken(['vendor']), async (req, res) => {
+    const employeeId = parseInt(req.params.employeeId, 10);
     const { name, email, mobile, role, address } = req.body;
-    const updated_by = req.user.id
+    const updated_by = req.user.id;
+
     try {
         const result = await pool.query({
             text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6, $7)',
@@ -738,21 +739,21 @@ app.put('/employees/:employeeId',verifyToken(['vendor']), async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({
                 statusCode: 404,
-                message: 'Employee not found'
+                message: 'Employee not found',
             });
         }
 
         res.status(200).json({
             statusCode: 200,
-            message: 'success',
-            employee: result.rows[0]
+            message: 'Employee(staff) updated successfully',
+            data: result.rows[0],
         });
     } catch (error) {
         console.error('Error updating employee:', error);
         res.status(500).json({
             statusCode: 500,
             message: 'Failed to update employee',
-            error: error.message
+            error: error.message,
         });
     }
 });
