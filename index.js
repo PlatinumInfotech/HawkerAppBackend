@@ -671,8 +671,8 @@ app.get('/employees/:employeeId', async (req, res) => {
     }
 });
 
-app.get('/vendors/:vendorId/employees', async (req, res) => {
-    const vendorId = parseInt(req.params.vendorId);
+app.get('/vendors/employees', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = parseInt(req.user.id);
   
     try {
       const result = await pool.query({
