@@ -281,14 +281,15 @@ app.delete('/vendors/:vendorId', async (req, res) => {
 });
 
 //CUSTOMERS
-app.post('/vendors/:vendorId/customers', async (req, res) => {
-    const vendorId = parseInt(req.user.vendorId);
+app.post('/vendors/customers', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = parseInt(req.user.id);
+    const created_by = req.user.id;
     const { name, email, mobile, address, status = 'active' } = req.body; // New field
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_customer($1, $2, $3, $4, $5, $6)',
-            values: [vendorId, name, email, mobile, address, status], // Automatically handles new fields
+            text: 'SELECT * FROM create_customer($1, $2, $3, $4, $5, $6, $7)',
+            values: [vendorId, name, email, mobile, address, status, created_by], // Automatically handles new fields
         });
         res.status(201).json({
             statusCode: 201,
@@ -405,14 +406,15 @@ app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async
 
 
 // Update Customer
-app.put('/vendors/:vendorId/customers/:customerId', async (req, res) => {
+app.put('/vendors/customers/:customerId', verifyToken(['vendor']), async (req, res) => {
     const customerId = parseInt(req.params.customerId);
+    const updated_by = parseInt(req.user.id);
     const { name, email, mobile, address } = req.body;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5)',
-            values: [customerId, name, email, mobile, address],
+            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5, $6)',
+            values: [customerId, name, email, mobile, address, updated_by],
         });
 
         if (result.rows.length === 0) {
@@ -472,12 +474,13 @@ app.delete('/vendors/customers/:customerId', async (req, res) => {
 //add product
 app.post('/products', verifyToken(['vendor']), async (req, res) => {
     const vendor_id = req.user.id;
+    const created_by = req.user.id;
     const { name, price_per_unit, unit } = req.body;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_product_func($1, $2, $3, $4)',
-            values: [vendor_id, name, price_per_unit, unit],
+            text: 'SELECT * FROM create_product_func($1, $2, $3, $4, $5)',
+            values: [vendor_id, name, price_per_unit, unit, created_by],
         });
 
         res.status(201).json({
