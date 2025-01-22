@@ -829,9 +829,42 @@ app.delete('/employees/:employeeId', async (req, res) => {
 });
 
 //Sales apis start
-app.post('/sales', verifyToken(['vendor','employee']), async (req, res) => {
+app.post('/sales', verifyToken(['vendor']), async (req, res) => {
     const { customer_id, product_id, quantity, price_per_unit, total_amount } = req.body;
     const vendor_id = req.user.id; // Extract vendor_id from token
+    const created_by = req.user.id;       // Extract user ID from token
+    console.log(req.user)
+    try {
+        const result = await pool.query({
+            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7)',
+            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, created_by],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(400).json({
+                statusCode: 400,
+                message: 'Failed to insert sales data',
+            });
+        }
+
+        res.status(201).json({
+            statusCode: 201,
+            message: 'Sales data inserted successfully',
+            sale: result.rows[0], // Return the inserted sale
+        });
+    } catch (error) {
+        console.error('Error inserting sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to insert sales data',
+            error: error.message,
+        });
+    }
+});
+
+//sale by employee
+app.post('/employee/sales', verifyToken(['employee']), async (req, res) => {
+    const { vendor_id,customer_id, product_id, quantity, price_per_unit, total_amount } = req.body;
     const created_by = req.user.id;       // Extract user ID from token
     console.log(req.user)
     try {
