@@ -883,7 +883,7 @@ app.post('/employee/sales', verifyToken(['employee']), async (req, res) => {
         res.status(201).json({
             statusCode: 201,
             message: 'Sales data inserted successfully',
-            sale: result.rows[0], // Return the inserted sale
+            data: result.rows[0], // Return the inserted sale
         });
     } catch (error) {
         console.error('Error inserting sales data:', error);
