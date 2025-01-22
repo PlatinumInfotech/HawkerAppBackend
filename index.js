@@ -280,7 +280,7 @@ app.delete('/vendors/:vendorId', async (req, res) => {
     }
 });
 
-//CUSTOMERS
+//CUSTOMERS (Add by Vendor App)
 app.post('/vendors/customers', verifyToken(['vendor']), async (req, res) => {
     const vendorId = parseInt(req.user.id);
     const created_by = req.user.id;
@@ -551,6 +551,44 @@ app.get('/productByVendor', verifyToken(['vendor']), async (req, res) => {
         });
     }
 });
+
+//Products by vendor for employee screen
+app.get('/employee/productByVendor/:vendorId', verifyToken(['employee']), async (req, res) => {
+    try {
+        // Extract vendor_id from the token
+        const vendorId = parseInt(req.params.vendorId);
+        // console.log(vendorId)
+
+        // Call the PostgreSQL function with the vendor_id
+        const result = await pool.query({
+            text: 'SELECT * FROM get_products_by_vendor($1)',
+            values: [vendorId],
+        });
+
+        // Check if any products were found
+        if (result.rows.length === 0) {
+            return res.status(200).json({
+                statusCode: 200,
+                message: "No products found for this vendor",
+                data: [],
+            });
+        }
+
+        // Respond with the retrieved products
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: result.rows,
+        });
+    } catch (err) {
+        console.error('Error fetching products:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+        });
+    }
+});
+
 
 app.delete('/products/:productId', async (req, res) => {
     const productId = parseInt(req.params.productId);
@@ -879,6 +917,71 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
             statusCode: 500,
             message: 'Failed to retrieve sales data',
             error: error.message,
+        });
+    }
+});
+
+//customer count api for vendor
+app.get('/customers/count', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = req.user.id; // Extract vendorId from the token
+
+    try {
+        const result = await pool.query({
+            text: "SELECT COUNT(*) AS customer_count FROM customers WHERE vendor_id = $1 AND status = 'active'",
+            values: [vendorId],
+        });
+        
+        const customerCount = result.rows[0].customer_count;
+
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: {
+                vendorId: vendorId,
+                customerCount: parseInt(customerCount, 10) // Ensure the count is returned as an integer
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching customer count:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
+        });
+    }
+});
+
+//yesterday sales amount vendor
+app.get('/sales/yesterday', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = req.user.id; // Extract vendorId from the token
+
+    try {
+        const result = await pool.query({
+            text: `
+                SELECT COALESCE(SUM(total_amount), 0) AS total_sales
+                FROM sales
+                WHERE vendor_id = $1
+                AND DATE(created_at) = CURRENT_DATE - INTERVAL '1 day'
+            `,
+            values: [vendorId],
+        });
+
+        const totalSales = result.rows[0].total_sales;
+
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: {
+                vendorId: vendorId,
+                totalSales: parseFloat(totalSales) // Ensure the sales amount is returned as a float
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching total sales for yesterday:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
         });
     }
 });
