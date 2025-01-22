@@ -1019,6 +1019,59 @@ app.get('/sales/yesterday', verifyToken(['vendor']), async (req, res) => {
     }
 });
 
+//yesterday highest sale product
+app.get('/sales/highest-product',verifyToken(['vendor']),async(req,res)=>{
+    const vendorId = req.user.id;
+
+    try{
+
+        const result = await pool.query({
+            text: `
+                SELECT 
+                    p.id AS product_id,
+                    p.name AS product_name,
+                    SUM(s.quantity) AS total_quantity_sold
+                FROM sales s
+                INNER JOIN products p ON s.product_id = p.id
+                WHERE s.vendor_id = $1
+                AND DATE(s.created_at) = CURRENT_DATE - INTERVAL '1 day'
+                GROUP BY p.id, p.name
+                ORDER BY total_quantity_sold DESC
+                LIMIT 1
+            `,
+            values: [vendorId],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(200).json({
+                statusCode: 200,
+                message: "No sales found for yesterday",
+                data: null
+            });
+        }
+
+         
+        const highestSaleProduct = result.rows[0];
+
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: {
+                productId: highestSaleProduct.product_id,
+                product_name: highestSaleProduct.product_name,
+                totalQuantitySold: parseFloat(highestSaleProduct.total_quantity_sold)
+            }
+        })
+    }catch (err) {
+        console.error('Error fetching highest sold product for yesterday:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
+        });
+    }
+})
+
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
