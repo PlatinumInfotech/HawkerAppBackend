@@ -894,7 +894,7 @@ app.post('/employee/sales', verifyToken(['employee']), async (req, res) => {
         });
     }
 });
-
+//monthly sales report
 app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), async (req, res) => {
     // const customerId = parseInt(req.params.customerId, 10);
     // const vendorId = req.user.id; // Extract vendor_id from the token
@@ -915,7 +915,8 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
                     s.price_per_unit,
                     s.total_amount,
                     s.created_at,
-                    s.created_by
+                    s.created_by,
+                    SUM(s.total_amount) OVER () AS total_monthly_expenses
                 FROM 
                     sales s
                 JOIN 
@@ -939,10 +940,14 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
             });
         }
 
+        const salesData = result.rows;
+        const totalMonthlyExpenses = parseFloat(salesData[0].total_monthly_expenses) || 0;
+
         res.status(200).json({
             statusCode: 200,
             message: 'Sales data retrieved successfully',
-            sales: result.rows, // Return sales data with customer and product details
+            totalMonthlyExpenses, // Return the total of monthly expenses
+            sales: salesData, // Return sales data with customer and product details
         });
     } catch (error) {
         console.error('Error retrieving sales data:', error);
