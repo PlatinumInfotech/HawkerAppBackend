@@ -959,7 +959,7 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
     }
 });
 
-//customer count api for vendor
+//active customer count api for vendor
 app.get('/customers/count', verifyToken(['vendor']), async (req, res) => {
     const vendorId = req.user.id; // Extract vendorId from the token
 
@@ -1077,6 +1077,35 @@ app.get('/sales/highest-product',verifyToken(['vendor']),async(req,res)=>{
     }
 })
 
+//Total Active Products API
+app.get('/active-products/count', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = req.user.id; // Extract vendorId from the token
+
+    try {
+        const result = await pool.query({
+            text: "SELECT COUNT(*) AS active_product_count FROM products WHERE vendor_id = $1 AND status = 'active'",
+            values: [vendorId],
+        });
+        
+        const customerCount = result.rows[0].active_product_count;
+
+        res.status(200).json({
+            statusCode: 200,
+            message: "success",
+            data: {
+                vendorId: vendorId,
+                active_product_count: parseInt(customerCount, 10) // Ensure the count is returned as an integer
+            }
+        });
+    } catch (err) {
+        console.error('Error fetching products count:', err);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
+        });
+    }
+});
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
