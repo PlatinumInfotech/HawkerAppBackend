@@ -73,6 +73,7 @@ const verifyToken = (allowedRoles) => {
     };
 };
 
+
 app.post('/login', async (req, res) => {
     const { mobile, userType } = req.body;
 
@@ -1106,6 +1107,84 @@ app.get('/active-products/count', verifyToken(['vendor']), async (req, res) => {
         });
     }
 });
+
+// Vendor Registration Api
+app.post('/register/vendor', async(req,res)=>{
+    const {name, email, mobile, address, business_name, gst_number} =  req.body;
+
+    if(!name || !email || !mobile){
+        return res.status(400).json({
+            statusCode: 400,
+            message: 'Name, email and mobile are required fields.'
+        });
+    }
+
+    try{
+        // Check if email or mobile already exists
+        const existingVendor = await pool.query(
+            'SELECT * FROM vendors WHERE email = $1 OR mobile =$2',
+            [email,mobile]
+        );
+
+        if(existingVendor.rows.length > 0){
+            return res.status(409).json({
+                statusCode: 409,
+                message: 'Email and mobile number are already registered'
+            })
+        }
+
+        // Insert the new vendor into the database
+        const result = await pool.query(
+            `
+            INSERT INTO vendors(name, email, mobile, address, business_name, gst_number)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id, name, email, mobile, address, business_name, gst_number
+            `,
+            [ name, email, mobile, address || null, business_name ||null, gst_number || null]
+        )
+
+        const newVendor = result.rows[0];
+
+        const createdBy = newVendor.id;
+
+        // Update the created_by field for the vendor
+        await pool.query(
+            `
+            UPDATE vendors
+            SET created_by = $1
+            WHERE id = $2
+            `,
+            [createdBy, createdBy]
+        );
+
+
+        // Create JWT token
+        const payload = {
+            id: result.id,
+            mobile: result.mobile,
+            name: result.name,
+            userType: 'vendor'
+        };
+
+        const secretKey = process.env.JWT_SECRET || 'ABCD';
+        const token = jwt.sign(payload, secretKey, { expiresIn: '1d' });
+
+        return res.status(201).json({
+            statusCode: 201,
+            message: 'Vendor registered successfully.',
+            data: newVendor,
+            token
+        })
+    }catch(err){
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Internal server error',
+            error: err.message
+        })
+    }
+})
+
+
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
