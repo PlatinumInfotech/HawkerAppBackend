@@ -345,7 +345,7 @@ app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async
     // Implement logic to get all customers for a specific vendor
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM customers WHERE vendor_id = $1',
+            text: `SELECT * FROM customers WHERE vendor_id = $1 AND status='active'`,
             values: [req.params.vendorId],
         });
 
@@ -476,24 +476,29 @@ app.delete('/vendors/customers/:customerId', async (req, res) => {
 app.post('/products', verifyToken(['vendor']), async (req, res) => {
     const vendor_id = req.user.id;
     const created_by = req.user.id;
-    const { name, price_per_unit, unit } = req.body;
+    const { name, price_per_unit, unit, status = 'active' } = req.body;
+
+    if (!name || !price_per_unit || !unit) {
+        return res.status(400).json({ error: 'Missing required fields' });
+    }
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_product_func($1, $2, $3, $4, $5)',
-            values: [vendor_id, name, price_per_unit, unit, created_by],
+            text: 'SELECT * FROM create_product_func($1, $2, $3, $4, $5, $6)',
+            values: [vendor_id, name, price_per_unit, unit, status, created_by],
         });
 
         res.status(201).json({
             statusCode: 201,
             message: 'Product created successfully',
-            product: result.rows[0],
+            data: result.rows[0],
         });
     } catch (error) {
         console.error('Error creating product:', error);
         res.status(500).json({ error: 'Failed to create product' });
     }
 });
+
 
 app.get('/products', async (req, res) => {
     try {
