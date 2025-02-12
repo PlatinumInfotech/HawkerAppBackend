@@ -294,7 +294,7 @@ app.post('/vendors/customers', verifyToken(['vendor']), async (req, res) => {
         });
         res.status(201).json({
             statusCode: 201,
-            message: 'Customer created successfully',
+            message: 'Customer added successfully',
             data: result.rows[0],
         });
     } catch (err) {
@@ -345,7 +345,7 @@ app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async
     // Implement logic to get all customers for a specific vendor
     try {
         const result = await pool.query({
-            text: `SELECT * FROM customers WHERE vendor_id = $1 AND status='active'`,
+            text: `SELECT * FROM customers WHERE vendor_id = $1 AND status='active' ORDER BY name ASC`,
             values: [req.params.vendorId],
         });
 
@@ -410,12 +410,12 @@ app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async
 app.put('/vendors/customers/:customerId', verifyToken(['vendor']), async (req, res) => {
     const customerId = parseInt(req.params.customerId);
     const updated_by = parseInt(req.user.id);
-    const { name, email, mobile, address } = req.body;
+    const { name, email, mobile, address, status } = req.body;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5, $6)',
-            values: [customerId, name, email, mobile, address, updated_by],
+            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5, $6, $7)',
+            values: [customerId, name, email, mobile, address, status, updated_by],
         });
 
         if (result.rows.length === 0) {
@@ -428,7 +428,7 @@ app.put('/vendors/customers/:customerId', verifyToken(['vendor']), async (req, r
         res.status(200).json({
             statusCode: 200,
             message: 'Customer updated successfully',
-            customer: result.rows[0],
+            data: result.rows[0],
         });
     } catch (error) {
         console.error('Error updating customer:', error);
@@ -530,16 +530,15 @@ app.get('/productByVendor', verifyToken(['vendor']), async (req, res) => {
 
         // Call the PostgreSQL function with the vendor_id
         const result = await pool.query({
-            text: 'SELECT * FROM get_products_by_vendor($1)',
+            text: 'SELECT * FROM get_products_by_vendor($1) ORDER BY product_name ASC',
             values: [vendorId],
         });
 
         // Check if any products were found
         if (result.rows.length === 0) {
-            return res.status(200).json({
-                statusCode: 200,
-                message: "No products found for this vendor",
-                data: [],
+            return res.status(404).json({
+                statusCode: 404,
+                message: "No products found"
             });
         }
 
@@ -614,7 +613,7 @@ app.delete('/products/:productId', async (req, res) => {
 
 app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
     const productId = parseInt(req.params.productId, 10);
-    const { name, price_per_unit, unit } = req.body;
+    const { name, price_per_unit, unit, status } = req.body;
 
     try {
         // Extract vendor_id from the token
@@ -630,8 +629,8 @@ app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
 
         // Call the PostgreSQL function to update the product
         const result = await pool.query({
-            text: 'SELECT * FROM update_product($1, $2, $3, $4, $5, $6)',
-            values: [vendorId, productId, name, price_per_unit, unit, updated_by],
+            text: 'SELECT * FROM update_product($1, $2, $3, $4, $5, $6, $7)',
+            values: [vendorId, productId, name, price_per_unit, unit, status, updated_by],
         });
 
         if (result.rows.length === 0) {
@@ -644,7 +643,7 @@ app.put('/products/:productId', verifyToken(['vendor']), async (req, res) => {
         res.status(200).json({
             statusCode: 200,
             message: 'Product updated successfully',
-            product: result.rows[0],
+            data: result.rows[0],
         });
     } catch (error) {
         console.error('Error updating product:', error.stack); // Log the full error stack
@@ -720,7 +719,7 @@ app.get('/vendors/employees', verifyToken(['vendor']), async (req, res) => {
   
     try {
       const result = await pool.query({
-        text: 'SELECT * FROM employees WHERE vendor_id = $1',
+        text: 'SELECT * FROM employees WHERE vendor_id = $1 ORDER BY name ASC',
         values: [vendorId],
       });
   
@@ -771,13 +770,13 @@ app.get('/employees', async (req, res) => {
 // Update Employee
 app.put('/employees/:employeeId', verifyToken(['vendor']), async (req, res) => {
     const employeeId = parseInt(req.params.employeeId, 10);
-    const { name, email, mobile, role, address } = req.body;
+    const { name, email, mobile, role, address, status } = req.body;
     const updated_by = req.user.id;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6, $7)',
-            values: [employeeId, name, email, mobile, role, address, updated_by],
+            text: 'SELECT * FROM update_employee($1, $2, $3, $4, $5, $6, $7, $8)',
+            values: [employeeId, name, email, mobile, role, address, status, updated_by],
         });
 
         if (result.rows.length === 0) {
