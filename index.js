@@ -349,6 +349,13 @@ app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async
             values: [req.params.vendorId],
         });
 
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Customers not found',
+            });
+        }
+
         res.status(200).json({
             statusCode: 200,
             message: 'success',
@@ -724,10 +731,9 @@ app.get('/vendors/employees', verifyToken(['vendor']), async (req, res) => {
       });
   
       if (result.rows.length === 0) {
-        return res.status(200).json({ 
-          statusCode: 200, 
-          message: 'No employees found for this vendor', 
-          data: [] 
+        return res.status(404).json({ 
+          statusCode: 404, 
+          message: 'No employees found'
         });
       }
   
