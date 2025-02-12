@@ -1117,10 +1117,10 @@ app.get('/active-products/count', verifyToken(['vendor']), async (req, res) => {
 app.post('/register/vendor', async(req,res)=>{
     const {name, email, mobile, address, business_name, gst_number} =  req.body;
 
-    if(!name || !email || !mobile){
+    if(!name || !email || !mobile || !business_name){
         return res.status(400).json({
             statusCode: 400,
-            message: 'Name, email and mobile are required fields.'
+            message: 'Name, email, mobile and business name are required fields.'
         });
     }
 
@@ -1134,7 +1134,7 @@ app.post('/register/vendor', async(req,res)=>{
         if(existingVendor.rows.length > 0){
             return res.status(409).json({
                 statusCode: 409,
-                message: 'Email and mobile number are already registered'
+                message: 'It looks like you already have an account with this email and mobile number. Please log in.'
             })
         }
 
