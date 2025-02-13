@@ -951,7 +951,17 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
             });
         }
 
-        const salesData = result.rows;
+        // Format the date before sending the response
+        const salesData = result.rows.map((sale) => ({
+            ...sale,
+            formatted_date: new Intl.DateTimeFormat('en-US', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            }).format(new Date(sale.created_at)), // Format date to "13 Feb, 2024"
+        }));
+
+        // const salesData = result.rows;
         const totalMonthlyExpenses = parseFloat(salesData[0].total_monthly_expenses) || 0;
 
         res.status(200).json({
