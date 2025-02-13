@@ -726,7 +726,7 @@ app.get('/vendors/employees', verifyToken(['vendor']), async (req, res) => {
   
     try {
       const result = await pool.query({
-        text: 'SELECT * FROM employees WHERE vendor_id = $1 ORDER BY name ASC',
+        text: `SELECT * FROM employees WHERE vendor_id = $1 AND status='active' ORDER BY name ASC`,
         values: [vendorId],
       });
   
