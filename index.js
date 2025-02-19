@@ -980,6 +980,55 @@ app.post('/sales/customer', verifyToken(['vendor', 'employee','customer']), asyn
     }
 });
 
+app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer']), async (req, res) => {
+    const { vendorId, customerId, month, year } = req.body;
+
+    try {
+        const result = await pool.query({
+            text: `
+                SELECT 
+                    p.name AS product_name,
+                    SUM(s.quantity) AS total_quantity_sold,
+                    SUM(s.total_amount) AS total_sales_amount
+                FROM 
+                    sales s
+                JOIN 
+                    products p ON s.product_id = p.id
+                WHERE 
+                    s.vendor_id = $1
+                    AND s.customer_id = $2
+                    AND EXTRACT(MONTH FROM s.created_at) = $3
+                    AND EXTRACT(YEAR FROM s.created_at) = $4
+                GROUP BY 
+                    p.name
+                ORDER BY 
+                    p.name ASC
+            `,
+            values: [vendorId, customerId, month, year],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'No sales data found for the given criteria',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Product sales summary retrieved successfully',
+            salesSummary: result.rows,
+        });
+    } catch (error) {
+        console.error('Error retrieving sales summary:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to retrieve sales summary',
+            error: error.message,
+        });
+    }
+});
+
 //active customer count api for vendor
 app.get('/customers/count', verifyToken(['vendor']), async (req, res) => {
     const vendorId = req.user.id; // Extract vendorId from the token
