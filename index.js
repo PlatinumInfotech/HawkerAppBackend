@@ -986,7 +986,8 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
     try {
         const result = await pool.query({
             text: `
-                SELECT 
+                SELECT
+                    p.id AS product_id,
                     p.name AS product_name,
                     SUM(s.quantity) AS total_quantity_sold,
                     SUM(s.total_amount) AS total_sales_amount
@@ -1000,7 +1001,7 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
                     AND EXTRACT(MONTH FROM s.created_at) = $3
                     AND EXTRACT(YEAR FROM s.created_at) = $4
                 GROUP BY 
-                    p.name
+                    p.id,p.name
                 ORDER BY 
                     p.name ASC
             `,
@@ -1028,6 +1029,99 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
         });
     }
 });
+
+app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer']), async (req, res) => {
+    const { vendorId, customerId, month, year, productId } = req.body;
+
+    try {
+        let queryText = `
+            SELECT 
+                s.id AS sale_id,
+                s.vendor_id,
+                s.customer_id,
+                c.name AS customer_name,
+                c.mobile AS customer_mobile,
+                s.product_id,
+                p.name AS product_name,
+                s.quantity,
+                s.price_per_unit,
+                s.total_amount,
+                s.created_at,
+                s.created_by,
+                SUM(s.total_amount) OVER () AS total_monthly_expenses
+            FROM 
+                sales s
+            JOIN 
+                customers c ON s.customer_id = c.id
+            JOIN 
+                products p ON s.product_id = p.id
+            WHERE 
+                s.customer_id = $1 
+                AND s.vendor_id = $2
+                AND EXTRACT(MONTH FROM s.created_at) = $3
+                AND EXTRACT(YEAR FROM s.created_at) = $4
+        `;
+
+        let queryValues = [customerId, vendorId, month, year];
+
+        // 🛠️ Agar productId send hui hai toh uska bhi filter laga do
+        if (productId) {
+            queryText += ` AND s.product_id = $5`;
+            queryValues.push(productId);
+        }
+
+        queryText += ` ORDER BY s.created_at DESC`;
+
+        const result = await pool.query({ text: queryText, values: queryValues });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'No sales data found for this customer',
+            });
+        }
+
+        // **Format the date before sending the response**
+        const salesData = result.rows.map((sale) => ({
+            ...sale,
+            formatted_date: new Intl.DateTimeFormat('en-US', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+            }).format(new Date(sale.created_at)), // Format date to "13 Feb, 2024"
+        }));
+
+        const totalMonthlyExpenses = parseFloat(salesData[0].total_monthly_expenses) || 0;
+
+        // **Fetch Grand Total for the Whole Month (All Products)**
+        const totalQuery = `
+            SELECT SUM(total_amount) AS grand_total FROM sales
+            WHERE customer_id = $1 
+            AND vendor_id = $2
+            AND EXTRACT(MONTH FROM created_at) = $3
+            AND EXTRACT(YEAR FROM created_at) = $4
+        `;
+        const totalResult = await pool.query({ text: totalQuery, values: [customerId, vendorId, month, year] });
+        const grandTotalMonthlyExpense = parseFloat(totalResult.rows[0].grand_total) || 0;
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Sales data retrieved successfully',
+            totalMonthlyExpenses, // 🔹 Current product's total expense
+            grandTotalMonthlyExpense, // 🔥 Whole month's total expense for all products
+            sales: salesData, // 📋 Return sales data with customer and product details
+        });
+    } catch (error) {
+        console.error('Error retrieving sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to retrieve sales data',
+            error: error.message,
+        });
+    }
+});
+
+
 
 //active customer count api for vendor
 app.get('/customers/count', verifyToken(['vendor']), async (req, res) => {
