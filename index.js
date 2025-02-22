@@ -988,6 +988,7 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
             text: `
                 SELECT
                     p.id AS product_id,
+                    p.unit AS product_unit,
                     p.name AS product_name,
                     SUM(s.quantity) AS total_quantity_sold,
                     SUM(s.total_amount) AS total_sales_amount
