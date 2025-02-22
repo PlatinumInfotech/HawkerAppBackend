@@ -1043,6 +1043,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
                 c.mobile AS customer_mobile,
                 s.product_id,
                 p.name AS product_name,
+                p.unit AS product_unit,
                 s.quantity,
                 s.price_per_unit,
                 s.total_amount,
@@ -1347,6 +1348,50 @@ app.post('/register/vendor', async(req,res)=>{
     }
 })
 
+//api to update sales
+app.put('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
+    const { sale_id } = req.params;
+    const { quantity, total_amount } = req.body; // Only necessary fields
+    const vendor_id = req.user.id; // Extract vendor_id from token
+    const updated_by = req.user.id;
+
+    try {
+        const result = await pool.query({
+            text: `
+                UPDATE sales 
+                SET 
+                    quantity = $1,
+                    total_amount = $2,
+                    updated_by = $3,
+                    updated_at = NOW()
+                WHERE 
+                    id = $4 AND vendor_id = $5
+                RETURNING id, quantity, total_amount, updated_by, updated_at;
+            `,
+            values: [quantity, total_amount, updated_by, sale_id, vendor_id],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Sale not found or unauthorized',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Sales data updated successfully',
+            sales: result.rows[0], // Return updated data
+        });
+    } catch (error) {
+        console.error('Error updating sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to update sales data',
+            error: error.message,
+        });
+    }
+});
 
 
 // Close the pool when the server is shutting down
