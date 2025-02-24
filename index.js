@@ -996,7 +996,7 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
                     sales s
                 JOIN 
                     products p ON s.product_id = p.id
-                WHERE 
+                WHERE
                     s.vendor_id = $1
                     AND s.customer_id = $2
                     AND EXTRACT(MONTH FROM s.created_at) = $3
@@ -1349,7 +1349,7 @@ app.post('/register/vendor', async(req,res)=>{
     }
 })
 
-//api to update sales
+//api to update sales for vendor
 app.put('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
     const { sale_id } = req.params;
     const { quantity, total_amount } = req.body; // Only necessary fields
@@ -1389,6 +1389,44 @@ app.put('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
         res.status(500).json({
             statusCode: 500,
             message: 'Failed to update sales data',
+            error: error.message,
+        });
+    }
+});
+
+//api to delete sales for vendor
+app.delete('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
+    const { sale_id } = req.params;
+    const vendor_id = req.user.id; // Extract vendor_id from token
+
+    try {
+        const result = await pool.query({
+            text: `
+                DELETE FROM sales
+                WHERE 
+                    id = $1 AND vendor_id = $2
+                RETURNING id, product_id, quantity, total_amount;
+            `,
+            values: [sale_id, vendor_id],
+        });
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Sale not found or unauthorized',
+            });
+        }
+
+        res.status(200).json({
+            statusCode: 200,
+            message: 'Sales data deleted successfully',
+            data: result.rows[0], // Return updated data
+        });
+    } catch (error) {
+        console.error('Error deleting sales data:', error);
+        res.status(500).json({
+            statusCode: 500,
+            message: 'Failed to delete sales data',
             error: error.message,
         });
     }
