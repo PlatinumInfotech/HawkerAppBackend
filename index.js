@@ -1350,39 +1350,49 @@ app.post('/register/vendor', async(req,res)=>{
 })
 
 //api to update sales for vendor
-app.put('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
+app.put('/sales/:sale_id', verifyToken(['vendor', 'employee']), async (req, res) => {
     const { sale_id } = req.params;
-    const { quantity, total_amount } = req.body; // Only necessary fields
-    const vendor_id = req.user.id; // Extract vendor_id from token
-    const updated_by = req.user.id;
+    const { quantity, total_amount } = req.body;
+    const updated_by = req.user.id; // Jisne update kiya
+    let vendor_id;
 
     try {
+        // Pehle sale ki vendor_id nikal lo
+        const saleResult = await pool.query({
+            text: `SELECT vendor_id FROM sales WHERE id = $1`,
+            values: [sale_id],
+        });
+
+        if (saleResult.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Sale not found',
+            });
+        }
+
+        // Vendor ID assign karo (jo bhi sale ka owner hai)
+        vendor_id = saleResult.rows[0].vendor_id;
+
+        // Ab update query chalao, lekin updated_by me vendor_id store karo
         const result = await pool.query({
             text: `
                 UPDATE sales 
                 SET 
                     quantity = $1,
                     total_amount = $2,
-                    updated_by = $3,
+                    updated_by = $3, -- Yeh vendor_id hamesha hoga
                     updated_at = NOW()
                 WHERE 
-                    id = $4 AND vendor_id = $5
+                    id = $4
                 RETURNING id, quantity, total_amount, updated_by, updated_at;
             `,
-            values: [quantity, total_amount, updated_by, sale_id, vendor_id],
+            values: [quantity, total_amount, vendor_id, sale_id], // updated_by = vendor_id
         });
-
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                statusCode: 404,
-                message: 'Sale not found or unauthorized',
-            });
-        }
 
         res.status(200).json({
             statusCode: 200,
             message: 'Sales data updated successfully',
-            sales: result.rows[0], // Return updated data
+            sales: result.rows[0],
         });
     } catch (error) {
         console.error('Error updating sales data:', error);
@@ -1395,11 +1405,28 @@ app.put('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
 });
 
 //api to delete sales for vendor
-app.delete('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
+app.delete('/sales/:sale_id', verifyToken(['vendor','employee']), async (req, res) => {
     const { sale_id } = req.params;
-    const vendor_id = req.user.id; // Extract vendor_id from token
+    // const vendor_id = req.user.id; // Extract vendor_id from token
+    let vendor_id;
 
     try {
+        // Pehle sale ki vendor_id nikal lo
+        const saleResult = await pool.query({
+            text: `SELECT vendor_id FROM sales WHERE id = $1`,
+            values: [sale_id],
+        });
+
+        if (saleResult.rows.length === 0) {
+            return res.status(404).json({
+                statusCode: 404,
+                message: 'Sale not found',
+            });
+        }
+
+        // Vendor ID assign karo (jo bhi sale ka owner hai)
+        vendor_id = saleResult.rows[0].vendor_id;
+        
         const result = await pool.query({
             text: `
                 DELETE FROM sales
@@ -1431,6 +1458,7 @@ app.delete('/sales/:sale_id', verifyToken(['vendor']), async (req, res) => {
         });
     }
 });
+
 
 
 // Close the pool when the server is shutting down
