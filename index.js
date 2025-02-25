@@ -876,13 +876,14 @@ app.post('/sales', verifyToken(['vendor']), async (req, res) => {
 
 //sale by employee
 app.post('/employee/sales', verifyToken(['employee']), async (req, res) => {
-    const { vendor_id,customer_id, product_id, quantity, price_per_unit, total_amount } = req.body;
+    const { vendor_id,customer_id, product_id, quantity, price_per_unit, sale_date } = req.body;
     const created_by = req.user.id;       // Extract user ID from token
-    console.log(req.user)
+    // console.log(req.user);
+    const total_amount = quantity * price_per_unit;
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7)',
-            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, created_by],
+            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7, $8)',
+            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, sale_date, created_by],
         });
 
         if (result.rows.length === 0) {
