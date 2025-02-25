@@ -841,14 +841,15 @@ app.delete('/employees/:employeeId', async (req, res) => {
 
 //Sales apis start
 app.post('/sales', verifyToken(['vendor']), async (req, res) => {
-    const { customer_id, product_id, quantity, price_per_unit, total_amount } = req.body;
+    const { customer_id, product_id, quantity, price_per_unit, sale_date } = req.body;
     const vendor_id = req.user.id; // Extract vendor_id from token
-    const created_by = req.user.id;       // Extract user ID from token
-    console.log(req.user)
+    const created_by = req.user.id; // Extract user ID from token
+    const total_amount = quantity * price_per_unit;
+
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7)',
-            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, created_by],
+            text: 'SELECT * FROM insert_sales($1, $2, $3, $4, $5, $6, $7, $8)',
+            values: [vendor_id, customer_id, product_id, quantity, price_per_unit, total_amount, sale_date, created_by],
         });
 
         if (result.rows.length === 0) {
@@ -1352,7 +1353,7 @@ app.post('/register/vendor', async(req,res)=>{
 //api to update sales for vendor
 app.put('/sales/:sale_id', verifyToken(['vendor', 'employee']), async (req, res) => {
     const { sale_id } = req.params;
-    const { quantity, total_amount } = req.body;
+    const { quantity, price_per_unit, sale_date } = req.body;
     const updated_by = req.user.id; // Jisne update kiya
     let vendor_id;
 
@@ -1373,20 +1374,24 @@ app.put('/sales/:sale_id', verifyToken(['vendor', 'employee']), async (req, res)
         // Vendor ID assign karo (jo bhi sale ka owner hai)
         vendor_id = saleResult.rows[0].vendor_id;
 
+        const total_amount = quantity * price_per_unit;
+
         // Ab update query chalao, lekin updated_by me vendor_id store karo
         const result = await pool.query({
             text: `
                 UPDATE sales 
                 SET 
                     quantity = $1,
-                    total_amount = $2,
-                    updated_by = $3, -- Yeh vendor_id hamesha hoga
+                    price_per_unit = $2,
+                    total_amount = $3,
+                    sale_date = $4,
+                    updated_by = $5, -- Yeh vendor_id hamesha hoga
                     updated_at = NOW()
                 WHERE 
-                    id = $4
-                RETURNING id, quantity, total_amount, updated_by, updated_at;
+                    id = $6
+                RETURNING id, quantity, price_per_unit, total_amount, sale_date, updated_by, updated_at;
             `,
-            values: [quantity, total_amount, vendor_id, sale_id], // updated_by = vendor_id
+            values: [quantity, price_per_unit, total_amount, sale_date, vendor_id, sale_id], // updated_by = vendor_id
         });
 
         res.status(200).json({
