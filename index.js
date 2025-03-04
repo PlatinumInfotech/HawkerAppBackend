@@ -341,33 +341,29 @@ app.get('/vendors/:vendorId/customers/:customerId', async (req, res) => {
 });
 
 // Get All Customers (for a specific vendor)
-app.get('/vendors/:vendorId/customers',verifyToken(['vendor','employee']), async (req, res) => {
-    // Implement logic to get all customers for a specific vendor
+app.get('/vendors/:vendorId/customers', verifyToken(['vendor', 'employee']), async (req, res) => {
     try {
-        const result = await pool.query({
-            text: `SELECT * FROM customers WHERE vendor_id = $1 AND status='active' ORDER BY name ASC`,
-            values: [req.params.vendorId],
-        });
+        const { vendorId } = req.params;
+        const search = req.query.search || ''; // Get search term or default to empty
 
-        if (result.rows.length === 0) {
-            return res.status(404).json({
-                statusCode: 404,
-                message: 'Customers not found',
-            });
-        }
+        const result = await pool.query(
+            `SELECT * FROM customers 
+             WHERE vendor_id = $1 
+             AND status='active' 
+             AND (name ILIKE $2 OR mobile ILIKE $2)
+             ORDER BY name ASC`,
+            [vendorId, `%${search}%`]
+        );
 
-        res.status(200).json({
-            statusCode: 200,
-            message: 'success',
+        res.status(result.rows.length ? 200 : 404).json({
+            statusCode: result.rows.length ? 200 : 404,
+            message: result.rows.length ? 'success' : 'No matching customers found',
             data: result.rows,
         });
+
     } catch (error) {
         console.error('Error fetching customers:', error);
-        res.status(500).json({
-            statusCode: 500,
-            message: 'Failed to fetch customers',
-            error: error.message,
-        });
+        res.status(500).json({ statusCode: 500, message: 'Failed to fetch customers', error: error.message });
     }
 });
 
