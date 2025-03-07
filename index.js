@@ -541,7 +541,8 @@ app.get('/productByVendor', verifyToken(['vendor']), async (req, res) => {
         if (result.rows.length === 0) {
             return res.status(404).json({
                 statusCode: 404,
-                message: "No products found"
+                message: "No products found",
+                data: []
             });
         }
 
@@ -729,7 +730,8 @@ app.get('/vendors/employees', verifyToken(['vendor']), async (req, res) => {
       if (result.rows.length === 0) {
         return res.status(404).json({ 
           statusCode: 404, 
-          message: 'No employees found'
+          message: 'No employees found',
+          data: []
         });
       }
   
