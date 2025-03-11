@@ -213,6 +213,74 @@ app.get('/vendor/:id', async (req, res) => {
     }
 });
 
+//get vendor details by id
+app.get('/vendor', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = req.user.id;
+
+    try {
+        // Query the function directly to get vendor details by ID
+        const result = await pool.query(`
+            SELECT * FROM vendors 
+            WHERE id = $1`
+            , [vendorId]);
+
+        // Check if result exists
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Vendor not found' });
+        }
+
+        // Return the JSON result with vendor details
+        res.json({statusCode: 200, message: "success", data:result.rows[0]});
+    } catch (err) {
+        console.error('Query error:', err.stack);
+        res.status(500).send({ message: 'Internal server error' });
+    }
+});
+
+//update vendor details (Profile api)
+app.put('/vendor', verifyToken(['vendor']), async (req, res) => {
+    const vendorId = req.user.id;
+
+    const {
+        name, email, mobile, address, business_name, gst_number, business_image, qr_code_image
+    } = req.body;
+
+    try {
+        // Query the function directly to get vendor details by ID
+        const result = await pool.query({
+            text:`
+            UPDATE vendors 
+            SET
+                name = $1,
+                email = $2,
+                mobile = $3,
+                address = $4,
+                business_name = $5,
+                gst_number = $6,
+                business_image = $7,
+                qr_code_image = $8,
+                updated_by = $9,
+                updated_at = NOW()  
+            WHERE
+                id = $10
+            RETURNING id, name, email, mobile, address, business_name, gst_number, business_image, qr_code_image, updated_by, updated_at;
+            `
+            , values: [name, email, mobile, address, business_name, gst_number, business_image, qr_code_image, vendorId, vendorId ]});
+
+
+        // Check if result exists
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Vendor not found' });
+        }
+
+        // Return the JSON result with vendor details
+        res.json({statusCode: 200, message: "Profile updated successfully", data:result.rows[0]});
+    } catch (err) {
+        console.error('Query error:', err.stack);
+        res.status(500).send({ message: 'Internal server error' });
+    }
+});
+
 // Update Vendor
 app.put('/vendors/:vendorId', async (req, res) => {
     const vendorId = parseInt(req.params.vendorId);
