@@ -4,7 +4,8 @@ const { Pool } = require('pg');
 const jwt = require("jsonwebtoken")
 
 const app = express();
-app.use(express.json());
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // PostgreSQL connection pool configuration
 const pool = new Pool({
@@ -1116,6 +1117,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
                 s.quantity,
                 s.price_per_unit,
                 s.total_amount,
+                s.sale_date,
                 s.created_at,
                 s.created_by,
                 SUM(s.total_amount) OVER () AS total_monthly_expenses
