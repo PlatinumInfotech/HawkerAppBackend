@@ -1130,8 +1130,8 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
             WHERE 
                 s.customer_id = $1 
                 AND s.vendor_id = $2
-                AND EXTRACT(MONTH FROM s.created_at) = $3
-                AND EXTRACT(YEAR FROM s.created_at) = $4
+                AND EXTRACT(MONTH FROM s.sale_date) = $3
+                AND EXTRACT(YEAR FROM s.sale_date) = $4
         `;
 
         let queryValues = [customerId, vendorId, month, year];
@@ -1142,7 +1142,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
             queryValues.push(productId);
         }
 
-        queryText += ` ORDER BY s.created_at DESC`;
+        queryText += ` ORDER BY s.sale_date DESC`;
 
         const result = await pool.query({ text: queryText, values: queryValues });
 
@@ -1160,7 +1160,8 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric',
-            }).format(new Date(sale.created_at)), // Format date to "13 Feb, 2024"
+                timeZone: 'UTC',
+            }).format(new Date(sale.sale_date)), // Format date to "13 Feb, 2024"
         }));
 
         const totalMonthlyExpenses = parseFloat(salesData[0].total_monthly_expenses) || 0;
