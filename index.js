@@ -1534,6 +1534,36 @@ app.delete('/sales/:sale_id', verifyToken(['vendor','employee']), async (req, re
     }
 });
 
+//get vendor details for payment (for customer)
+app.post('/customer/qr', verifyToken(['customer']), async (req, res) => {
+    const { vendorId } = req.body;
+
+    // Validate vendorId
+    if (!vendorId) {
+        return res.status(400).json({ message: 'Vendor ID is required' });
+    }
+    
+    try {
+        
+        // Query the function directly to get vendor details by ID
+        const result = await pool.query(`
+            SELECT id, name, business_name, mobile, email, business_image, qr_code_image FROM vendors 
+            WHERE id = $1`
+            , [vendorId]);
+
+        // Check if result exists
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Vendor not found' });
+        }
+
+        // Return the JSON result with vendor details
+        res.json({statusCode: 200, message: "success", data:result.rows[0]});
+    } catch (err) {
+        console.error('Query error:', err.stack);
+        res.status(500).send({ message: 'Internal server error' });
+    }
+});
+
 
 
 // Close the pool when the server is shutting down
