@@ -23,52 +23,6 @@ const pool = new Pool({
     },
 });
 
-const http = require("http");
-const WebSocket = require("ws");
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-// Store WebSocket Clients
-const clients = {};
-
-// WebSocket Connection Handling
-wss.on("connection", (ws) => {
-    console.log("New client connected");
-  ws.on("message", async (data) => {
-    const { senderId, receiverId, message } = JSON.parse(data);
-
-    // Store message in PostgreSQL
-    const query = `
-      INSERT INTO chat_messages (sender_id, receiver_id, message) 
-      VALUES ($1, $2, $3) RETURNING *;
-    `;
-    await pool.query(query, [senderId, receiverId, message]);
-
-    // Send message to receiver if online
-    if (clients[receiverId]) {
-      clients[receiverId].send(JSON.stringify({ senderId, message }));
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("Client Disconnected");
-  });
-});
-
-// API to Fetch Chat History
-app.get("/messages", async (req, res) => {
-  const { senderId, receiverId } = req.query;
-  const query = `
-    SELECT * FROM chat_messages 
-    WHERE (sender_id = $1 AND receiver_id = $2) 
-       OR (sender_id = $2 AND receiver_id = $1)
-    ORDER BY timestamp ASC;
-  `;
-  const result = await pool.query(query, [senderId, receiverId]);
-  res.json(result.rows);
-});
-
-
 app.get('/', async (req, res) => {
     try {
         res.send("Hello world");
@@ -1622,6 +1576,6 @@ process.on('SIGINT', () => {
 });
 
 const PORT = 3000;
-server.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
 });
