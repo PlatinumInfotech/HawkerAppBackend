@@ -1348,7 +1348,7 @@ app.get('/active-products/count', verifyToken(['vendor']), async (req, res) => {
 app.post('/register/vendor', async(req,res)=>{
     const {name, email, mobile, address, business_name, gst_number} =  req.body;
 
-    if(!name || !email || !mobile || !business_name){
+    if(!name || !mobile || !business_name){
         return res.status(400).json({
             statusCode: 400,
             message: 'Name, email, mobile and business name are required fields.'
