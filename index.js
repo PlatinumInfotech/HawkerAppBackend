@@ -1236,7 +1236,7 @@ app.get('/sales/yesterday', verifyToken(['vendor']), async (req, res) => {
                 SELECT COALESCE(SUM(total_amount), 0) AS total_sales
                 FROM sales
                 WHERE vendor_id = $1
-                AND DATE(created_at) = CURRENT_DATE - INTERVAL '1 day'
+                AND DATE(sale_date) = CURRENT_DATE - INTERVAL '1 day'
             `,
             values: [vendorId],
         });
@@ -1276,7 +1276,7 @@ app.get('/sales/highest-product',verifyToken(['vendor']),async(req,res)=>{
                 FROM sales s
                 INNER JOIN products p ON s.product_id = p.id
                 WHERE s.vendor_id = $1
-                AND DATE(s.created_at) = CURRENT_DATE - INTERVAL '1 day'
+                AND DATE(s.sale_date) = CURRENT_DATE - INTERVAL '1 day'
                 GROUP BY p.id, p.name
                 ORDER BY total_quantity_sold DESC
                 LIMIT 1
