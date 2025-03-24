@@ -17,11 +17,11 @@ const pool = new Pool({
     max: 10,                      // Maximum number of connections in the pool
     idleTimeoutMillis: 30000,     // Close idle connections after 30 seconds
     connectionTimeoutMillis: 2000,
-    ssl: false
-    // ssl: {
-    //     rejectUnauthorized: false,
-    //     // ca: fs.readFileSync('/path/to/server-certificates/root.crt').toString(),
-    // },
+    // ssl: false
+    ssl: {
+        rejectUnauthorized: false,
+        // ca: fs.readFileSync('/path/to/server-certificates/root.crt').toString(),
+    },
 });
 
 app.get('/', async (req, res) => {
