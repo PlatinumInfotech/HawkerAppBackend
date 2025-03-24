@@ -17,10 +17,11 @@ const pool = new Pool({
     max: 10,                      // Maximum number of connections in the pool
     idleTimeoutMillis: 30000,     // Close idle connections after 30 seconds
     connectionTimeoutMillis: 2000,
-    ssl: {
-        rejectUnauthorized: false,
-        // ca: fs.readFileSync('/path/to/server-certificates/root.crt').toString(),
-    },
+    ssl: false
+    // ssl: {
+    //     rejectUnauthorized: false,
+    //     // ca: fs.readFileSync('/path/to/server-certificates/root.crt').toString(),
+    // },
 });
 
 app.get('/', async (req, res) => {
@@ -1195,7 +1196,6 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
 });
 
 
-
 //active customer count api for vendor
 app.get('/customers/count', verifyToken(['vendor']), async (req, res) => {
     const vendorId = req.user.id; // Extract vendorId from the token
@@ -1564,6 +1564,95 @@ app.post('/customer/qr', verifyToken(['customer']), async (req, res) => {
     }
 });
 
+//invoice generate
+app.post('/generate-invoice', async (req, res) => {
+    const { customer_id, month, year } = req.body;
+
+    try {
+        // Step 1: Define Start & End Dates
+        const start_date = `${year}-${month.toString().padStart(2, '0')}-01`;
+        const current_date = new Date();
+        const end_date = `${year}-${month.toString().padStart(2, '0')}-${current_date.getDate()}`;
+
+        // Step 2: Get all sales for the customer within the month
+        const salesResult = await pool.query(
+            "SELECT id, total_amount, sale_date FROM sales WHERE customer_id = $1 AND sale_date BETWEEN $2 AND $3",
+            [customer_id, start_date, end_date]
+        );
+
+        if (salesResult.rows.length === 0) {
+            return res.status(404).json({ message: "No sales found for this customer in the selected period." });
+        }
+
+        // Step 3: Find sales that are NOT present in any invoice yet
+        const saleIds = salesResult.rows.map(sale => sale.id);
+        const existingInvoices = await pool.query(
+            "SELECT sale_id FROM invoice_details WHERE sale_id = ANY($1)",
+            [saleIds]
+        );
+
+        const existingSaleIds = existingInvoices.rows.map(row => row.sale_id);
+        const newSales = salesResult.rows.filter(sale => !existingSaleIds.includes(sale.id));
+
+        if (newSales.length === 0) {
+            return res.status(400).json({ message: "Your invoice is already generated for all sales in this period." });
+        }
+
+        // Step 4: Create a new invoice for the remaining sales
+        const total_amount = newSales.reduce((sum, sale) => sum + parseFloat(sale.total_amount), 0);
+        const newInvoice = await pool.query(
+            "INSERT INTO invoice (start_date, end_date, total_amount, status, customer_id) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            [start_date, end_date, total_amount, 'pending', customer_id]
+        );
+        const invoice_id = newInvoice.rows[0].id;
+
+        // Step 5: Insert new sales into invoice_details
+        const insertQueries = newSales.map(sale =>
+            pool.query(
+                "INSERT INTO invoice_details (invoice_id, sale_id, paid_amount, amount) VALUES ($1, $2, $3, $4)",
+                [invoice_id, sale.id, 0, sale.total_amount]
+            )
+        );
+
+        await Promise.all(insertQueries);
+
+        res.status(201).json({ message: "Your invoice has been generated successfully.", invoice_id });
+
+    } catch (err) {
+        console.error('Query error:', err.stack);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// View All Invoices for a Customer
+app.post('/view-invoice', async (req, res) => {
+    const { customer_id } = req.body;
+
+    try {
+        if (!customer_id) {
+            return res.status(400).json({ message: "Customer ID is required" });
+        }
+
+        const result = await pool.query(
+            `SELECT id, total_amount, status, 
+                    TO_CHAR(start_date, 'Month YYYY') AS month 
+             FROM invoice 
+             WHERE customer_id = $1 
+             ORDER BY end_date DESC`, // Fetch all invoices, sorted by latest
+            [customer_id]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: "No invoices found" });
+        }
+
+        res.json({ statusCode: 200, message: "Success", data: result.rows });
+
+    } catch (err) {
+        console.error('Query error:', err.stack);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
 
 
 // Close the pool when the server is shutting down
