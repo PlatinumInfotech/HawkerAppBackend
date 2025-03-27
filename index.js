@@ -1666,6 +1666,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
             SELECT 
                 i.id AS invoice_id,  
                 i.total_amount,
+                (i.total_amount - COALESCE(SUM(id.paid_amount), 0)) AS due_amount,
                 TO_CHAR(i.end_date, 'Mon DD, YYYY') AS end_date,
                 JSON_AGG(
                     JSON_BUILD_OBJECT(
