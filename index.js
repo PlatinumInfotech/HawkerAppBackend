@@ -1565,7 +1565,7 @@ app.post('/customer/qr', verifyToken(['customer']), async (req, res) => {
 });
 
 //invoice generate
-app.post('/generate-invoice', async (req, res) => {
+app.post('/generate-invoice', verifyToken(['vendor']),async (req, res) => {
     const { customer_id, month, year } = req.body;
 
     try {
@@ -1595,7 +1595,7 @@ app.post('/generate-invoice', async (req, res) => {
         const newSales = salesResult.rows.filter(sale => !existingSaleIds.includes(sale.id));
 
         if (newSales.length === 0) {
-            return res.status(400).json({ message: "Your invoice is already generated for all sales in this period." });
+            return res.status(200).json({ message: "Your invoice is already generated for all sales in this period." });
         }
 
         // Step 4: Create a new invoice for the remaining sales
@@ -1625,7 +1625,7 @@ app.post('/generate-invoice', async (req, res) => {
 });
 
 // View All Invoices for a Customer
-app.post('/view-invoice', async (req, res) => {
+app.post('/view-invoice', verifyToken(['vendor']), async (req, res) => {
     const { customer_id } = req.body;
 
     try {
@@ -1653,6 +1653,50 @@ app.post('/view-invoice', async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 });
+
+// View Invoice Details
+app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
+    const {customer_id,invoice_id} = req.body;
+    if (!invoice_id || !customer_id) {
+        return res.status(400).json({ error: "invoice_id and customer_id are required" });
+    }
+
+    try {
+        const query = `
+            SELECT 
+                i.id AS invoice_id,  
+                i.total_amount,
+                JSON_AGG(
+                    JSON_BUILD_OBJECT(
+                        'product_name', p.name,
+                        'sale_id', s.id,
+                        'amount', s.total_amount,
+                        'start_date', start_date,
+                        'end_date', end_date,
+                        'created_at', id.created_at
+                    )
+                ) AS sale_details
+            FROM invoice i
+            LEFT JOIN invoice_details id ON i.id = id.invoice_id  
+            LEFT JOIN sales s ON id.sale_id = s.id  
+            LEFT JOIN products p ON s.product_id = p.id  
+            WHERE i.id = $1 AND i.customer_id = $2
+            GROUP BY i.id, i.total_amount;
+        `;
+
+        const result = await pool.query(query, [invoice_id, customer_id]);
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "No sales details found" });
+        }
+
+        res.json({statusCode: 200,message:"success",data:result.rows[0]}); 
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
 
 
 // Close the pool when the server is shutting down
