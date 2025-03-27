@@ -1666,6 +1666,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
             SELECT 
                 i.id AS invoice_id,  
                 i.total_amount,
+                i.end_date,
                 JSON_AGG(
                     JSON_BUILD_OBJECT(
                         'product_name', p.name,
