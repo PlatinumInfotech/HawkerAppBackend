@@ -1676,6 +1676,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
                         'amount', s.total_amount,
                         'start_date', start_date,
                         'end_date', end_date,
+                        'sale_date',s.sale_date,
                         'created_at', id.created_at
                     )
                 ) AS sale_details
