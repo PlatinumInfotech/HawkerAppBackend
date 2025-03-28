@@ -1739,7 +1739,7 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
         if (remainingDue == 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({
-                error: "Invoice already paid. No further payment is required.",
+                message: "Invoice already paid. No further payment is required.",
                 remaining_due: remainingDue
             });
         }
@@ -1748,7 +1748,7 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
         if (amount > remainingDue) {
             await client.query('ROLLBACK'); // **Transaction rollback**
             return res.status(400).json({ 
-                error: "Payment exceeds due amount. Please enter a valid amount.",
+                message: "Payment exceeds due amount. Please enter a valid amount.",
                 remaining_due: remainingDue
             });
         }
