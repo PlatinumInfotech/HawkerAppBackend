@@ -1705,7 +1705,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
 });
 
 //Make Payment API
-app.post('/api/make-payment', async (req, res) => {
+app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
     const { invoice_id, customer_id, amount, payment_mode, notes } = req.body;
 
     if (!invoice_id || !customer_id || !amount || !payment_mode) {
