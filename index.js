@@ -1825,6 +1825,88 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
     }
 });
 
+// Get Advance Payment
+app.get('/api/advance-payment/:customer_id', verifyToken(['vendor']), async (req,res)=>{
+    const { customer_id } = req.params;
+
+    if(!customer_id){
+        return res.status(400).json({message: "customer id are required"});
+    }
+
+    try{
+        const query = `select * from advance_payments WHERE customer_id = $1`
+
+        const result = await pool.query(query, [customer_id]);
+
+        if(result.rowCount === 0){
+            return res.status(400).json({message:"Advance payment record not found"});
+        }
+
+        res.json({
+            statusCode: 200,
+            message: 'success',
+            data: result.rows[0]
+        });
+    }catch(err){
+        // console.error("Error adding advance payment:", err);
+        res.json({ message: "Internal server error" });
+    }
+});
+
+// Add Advance Payment
+app.post('/api/advance-payment', verifyToken(['vendor']), async (req,res)=>{
+    const { customer_id, advance_amount } = req.body;
+
+    if(!customer_id || !advance_amount || advance_amount <= 0){
+        return res.status(400).json({message: "customer_id and valid advance_amount are required"});
+    }
+
+    try{
+        const query = `INSERT INTO advance_payments (customer_id, advance_amount) VALUES ($1, $2)
+        RETURNING id, customer_id, advance_amount, created_at`
+
+        const result = await pool.query(query, [customer_id, advance_amount]);
+
+        res.json({
+            success: 'success',
+            message: 'Advance payments addeed successfully',
+            data: result.rows[0]
+        });
+    }catch(err){
+        // console.error("Error adding advance payment:", err);
+        res.json({ message: "Internal server error" });
+    }
+});
+
+// Edit Advance Payment
+app.put('/api/update-advance-payment', verifyToken(['vendor']), async(req,res)=>{
+    const {advance_amount,customer_id} = req.body;
+    if(!advance_amount || advance_amount <= 0){
+        return res.status(400).json({message: 'Valid advance amount is required'})
+    }
+    
+    try{
+        const query =  `UPDATE advance_payments
+        SET advance_amount = $1, updated_at = NOW()
+        WHERE customer_id = $2
+        RETURNING id, customer_id, advance_amount, created_at, updated_at`;
+
+        const result = await pool.query(query,[advance_amount,scustomer_id]);
+
+        if(result.rowCount === 0){
+            return res.status(400).json({message:"Advance payment record not found"});
+        }
+
+        res.json({
+            statusCode: 200,
+            message:"Advance payment updated successfully",
+            data: result.rows[0]
+        })
+    }catch(err){
+        console.log(err)
+        res.json({ message: "Internal server error" });
+    }
+});
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
