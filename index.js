@@ -1171,10 +1171,10 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
         // **Fetch Grand Total for the Whole Month (All Products)**
         const totalQuery = `
             SELECT SUM(total_amount) AS grand_total FROM sales
-            WHERE customer_id = $1 
+            WHERE customer_id = $1
             AND vendor_id = $2
-            AND EXTRACT(MONTH FROM created_at) = $3
-            AND EXTRACT(YEAR FROM created_at) = $4
+            AND EXTRACT(MONTH FROM sale_date) = $3
+            AND EXTRACT(YEAR FROM sale_date) = $4
         `;
         const totalResult = await pool.query({ text: totalQuery, values: [customerId, vendorId, month, year] });
         const grandTotalMonthlyExpense = parseFloat(totalResult.rows[0].grand_total) || 0;
