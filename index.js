@@ -1070,8 +1070,8 @@ app.post('/sales/product-summary', verifyToken(['vendor', 'employee', 'customer'
                 WHERE
                     s.vendor_id = $1
                     AND s.customer_id = $2
-                    AND EXTRACT(MONTH FROM s.created_at) = $3
-                    AND EXTRACT(YEAR FROM s.created_at) = $4
+                    AND EXTRACT(MONTH FROM s.sale_date) = $3
+                    AND EXTRACT(YEAR FROM s.sale_date) = $4
                 GROUP BY 
                     p.id,p.name
                 ORDER BY 
@@ -1162,7 +1162,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
                 day: '2-digit',
                 month: 'short',
                 year: 'numeric',
-                timeZone: 'UTC',
+                // timeZone: 'UTC',
             }).format(new Date(sale.sale_date)), // Format date to "13 Feb, 2024"
         }));
 
@@ -1572,8 +1572,10 @@ app.post('/generate-invoice', verifyToken(['vendor']), async (req, res) => {
     try {
         // Step 1: Define Start & End Dates
         const start_date = `${year}-${month.toString().padStart(2, '0')}-01`;
-        const current_date = new Date();
-        const end_date = `${year}-${month.toString().padStart(2, '0')}-${current_date.getDate()}`;
+        const end_date = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate()}`; // Last date of the month
+        // const start_date = `${year}-${month.toString().padStart(2, '0')}-01`;
+        // const current_date = new Date();
+        // const end_date = `${year}-${month.toString().padStart(2, '0')}-${current_date.getDate()}`;
 
         // Step 2: Get all sales for the customer within the month
         const salesResult = await pool.query(
@@ -1706,7 +1708,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
 
 //Make Payment API
 app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
-    const { invoice_id, customer_id, amount, payment_mode, notes } = req.body;
+    const { invoice_id, customer_id, amount, payment_mode, notes, advancePayment } = req.body;
 
     if (!invoice_id || !customer_id || !amount || !payment_mode) {
         return res.status(400).json({ error: "invoice_id, customer_id, amount, and payment_mode are required" });
@@ -1720,7 +1722,7 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
         // **1. Get Total Due Amount for Invoice**
         const invoiceTotalQuery = `SELECT total_amount FROM invoice WHERE id = $1`;
         const invoiceTotalResult = await client.query(invoiceTotalQuery, [invoice_id]);
-        
+
         if (invoiceTotalResult.rowCount === 0) {
             throw new Error("Invoice not found");
         }
@@ -1735,7 +1737,7 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
         // **3. Calculate Remaining Due Amount**
         const remainingDue = totalAmount - totalPaid;
 
-        // Reject Extra Payment or Already Paid Invoice**
+        // **Reject Extra Payment or Already Paid Invoice**
         if (remainingDue == 0) {
             await client.query('ROLLBACK');
             return res.status(400).json({
@@ -1753,7 +1755,28 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
             });
         }
 
-        // **5. Insert Payment**
+        if (advancePayment) {
+            // **Advance Payment Case**
+            const advancePaymentQuery = `
+                UPDATE advance_payments
+                SET advance_amount = advance_amount - $1, updated_at = NOW()
+                WHERE customer_id = $2 AND advance_amount >= $1
+                RETURNING id, advance_amount
+            `;
+
+            const advancePaymentResult = await client.query(advancePaymentQuery, [amount, customer_id]);
+
+            // Debugging Log
+            console.log("Advance Payment Query Result:", advancePaymentResult.rows);
+
+            // Check if update was successful
+            if (advancePaymentResult.rowCount === 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ message: "Insufficient advance balance" });
+            }
+        }
+
+        // **5. Insert Payment (Even for Advance Payment)**
         const paymentQuery = `
             INSERT INTO payments (invoice_id, customer_id, amount, payment_mode, notes, payment_date, created_at)
             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
@@ -1825,6 +1848,7 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
     }
 });
 
+
 // Get Advance Payment
 app.get('/api/advance-payment/:customer_id', verifyToken(['vendor']), async (req,res)=>{
     const { customer_id } = req.params;
@@ -1858,66 +1882,132 @@ app.post('/api/advance-payment', verifyToken(['vendor']), async (req, res) => {
     const { customer_id, advance_amount } = req.body;
 
     if (!customer_id || !advance_amount || advance_amount <= 0) {
-        return res.status(400).json({ message: "customer_id and valid advance_amount are required" });
+        return res.status(400).json({ message: "customer id and valid advance amount are required" });
     }
 
+    const client = await pool.connect();
+
     try {
-        const query = `
+        await client.query('BEGIN'); // **Transaction Start**
+
+        // **1. Update or Insert into advance_payments**
+        const advancePaymentQuery = `
             INSERT INTO advance_payments (customer_id, advance_amount, created_at) 
             VALUES ($1, $2, NOW())
             ON CONFLICT (customer_id) 
             DO UPDATE SET advance_amount = advance_payments.advance_amount + EXCLUDED.advance_amount, updated_at = NOW()
             RETURNING id, customer_id, advance_amount, created_at, updated_at;
         `;
+        const advancePaymentResult = await client.query(advancePaymentQuery, [customer_id, advance_amount]);
 
-        const result = await pool.query(query, [customer_id, advance_amount]);
+        // **2. Insert into advance_payment_history**
+        const historyQuery = `
+            INSERT INTO advance_payment_history (customer_id, advance_amount, payment_date)
+            VALUES ($1, $2, NOW());
+        `;
+        await client.query(historyQuery, [customer_id, advance_amount]);
+
+        await client.query('COMMIT'); // **Transaction Commit**
 
         res.json({
             success: true,
             message: "Advance payment added successfully",
-            data: result.rows[0]
+            data: advancePaymentResult.rows[0]
         });
+
     } catch (err) {
+        await client.query('ROLLBACK'); // **Rollback in case of error**
         console.error("Error adding advance payment:", err);
         res.status(500).json({ message: "Internal server error" });
+    } finally {
+        client.release();
     }
 });
-
 
 // Edit Advance Payment
 app.put('/api/update-advance-payment', verifyToken(['vendor']), async (req, res) => {
     const { advance_amount, customer_id } = req.body;
 
-    // Validation: Customer ID bhi check ho raha hai
     if (!customer_id || !advance_amount || advance_amount <= 0) {
         return res.status(400).json({ message: 'Valid customer_id and advance_amount are required' });
     }
 
+    const client = await pool.connect();
+
     try {
-        const query = `
+        await client.query('BEGIN'); // **Transaction Start**
+
+        // **Update advance_payments Table**
+        const updateQuery = `
             UPDATE advance_payments
             SET advance_amount = $1, updated_at = NOW()
             WHERE customer_id = $2
-            RETURNING id, customer_id, advance_amount, created_at, updated_at
+            RETURNING id, customer_id, advance_amount, created_at, updated_at;
         `;
+        const updateResult = await client.query(updateQuery, [advance_amount, customer_id]);
 
-        const result = await pool.query(query, [advance_amount, customer_id]); // 🔥 Typo fixed
-
-        if (result.rowCount === 0) {
+        if (updateResult.rowCount === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ statusCode: 404, message: "Advance payment record not found" });
         }
+
+        // ** Insert Update Log into advance_payment_history Table**
+        const historyQuery = `
+            INSERT INTO advance_payment_history (customer_id, advance_amount, payment_date, updated_at)
+            VALUES ($1, $2, NOW(), NOW());
+        `;
+        await client.query(historyQuery, [customer_id, advance_amount]);
+
+        await client.query('COMMIT'); // **Transaction Commit**
 
         res.json({
             statusCode: 200,
             message: "Advance payment updated successfully",
-            data: result.rows[0]
+            data: updateResult.rows[0]
         });
 
     } catch (err) {
+        await client.query('ROLLBACK'); // **Rollback in case of error**
         console.error("Error updating advance payment:", err);
         res.status(500).json({ statusCode: 500, message: "Internal server error" });
+    } finally {
+        client.release();
     }
 });
+
+// app.put('/api/update-advance-payment', verifyToken(['vendor']), async (req, res) => {
+//     const { advance_amount, customer_id } = req.body;
+
+//     // Validation: Customer ID bhi check ho raha hai
+//     if (!customer_id || !advance_amount || advance_amount <= 0) {
+//         return res.status(400).json({ message: 'Valid customer_id and advance_amount are required' });
+//     }
+
+//     try {
+//         const query = `
+//             UPDATE advance_payments
+//             SET advance_amount = $1, updated_at = NOW()
+//             WHERE customer_id = $2
+//             RETURNING id, customer_id, advance_amount, created_at, updated_at
+//         `;
+
+//         const result = await pool.query(query, [advance_amount, customer_id]); // 🔥 Typo fixed
+
+//         if (result.rowCount === 0) {
+//             return res.status(404).json({ statusCode: 404, message: "Advance payment record not found" });
+//         }
+
+//         res.json({
+//             statusCode: 200,
+//             message: "Advance payment updated successfully",
+//             data: result.rows[0]
+//         });
+
+//     } catch (err) {
+//         console.error("Error updating advance payment:", err);
+//         res.status(500).json({ statusCode: 500, message: "Internal server error" });
+//     }
+// });
 
 
 // Close the pool when the server is shutting down
