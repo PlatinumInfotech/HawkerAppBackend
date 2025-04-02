@@ -2019,7 +2019,7 @@ process.on('SIGINT', () => {
     });
 });
 
-const PORT = 3000;
+const PORT = 80;
 app.listen(PORT, () => {
     console.log(`Server is listening on port ${PORT}`);
 });
