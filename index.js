@@ -1975,40 +1975,39 @@ app.put('/api/update-advance-payment', verifyToken(['vendor']), async (req, res)
     }
 });
 
-// app.put('/api/update-advance-payment', verifyToken(['vendor']), async (req, res) => {
-//     const { advance_amount, customer_id } = req.body;
+//Monthly Due API
+app.post('/api/monthly-due', verifyToken(['vendor']), async (req, res) => {
+    const { customer_id } = req.body;
+    if (!customer_id) {
+        return res.status(400).json({ error: "customer_id are required" });
+    }
 
-//     // Validation: Customer ID bhi check ho raha hai
-//     if (!customer_id || !advance_amount || advance_amount <= 0) {
-//         return res.status(400).json({ message: 'Valid customer_id and advance_amount are required' });
-//     }
+    try {
+        const query = `
+           SELECT 
+                COALESCE(SUM(i.total_amount), 0) - COALESCE(SUM(id.paid_amount), 0) AS monthly_due,
+                COALESCE(SUM(id.paid_amount), 0) AS total_paid_amount
+            FROM invoice i
+            LEFT JOIN (
+                SELECT invoice_id, SUM(paid_amount) AS paid_amount
+                FROM invoice_details
+                GROUP BY invoice_id
+            ) id ON i.id = id.invoice_id
+            WHERE i.customer_id = $1;
+                    `;
 
-//     try {
-//         const query = `
-//             UPDATE advance_payments
-//             SET advance_amount = $1, updated_at = NOW()
-//             WHERE customer_id = $2
-//             RETURNING id, customer_id, advance_amount, created_at, updated_at
-//         `;
+        const result = await pool.query(query, [customer_id]);
 
-//         const result = await pool.query(query, [advance_amount, customer_id]); // 🔥 Typo fixed
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "No sales details found" });
+        }
 
-//         if (result.rowCount === 0) {
-//             return res.status(404).json({ statusCode: 404, message: "Advance payment record not found" });
-//         }
-
-//         res.json({
-//             statusCode: 200,
-//             message: "Advance payment updated successfully",
-//             data: result.rows[0]
-//         });
-
-//     } catch (err) {
-//         console.error("Error updating advance payment:", err);
-//         res.status(500).json({ statusCode: 500, message: "Internal server error" });
-//     }
-// });
-
+        res.json({ statusCode: 200, message: "success", data: result.rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
 
 // Close the pool when the server is shutting down
 process.on('SIGINT', () => {
