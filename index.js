@@ -1619,6 +1619,12 @@ app.post('/generate-invoice', verifyToken(['vendor']), async (req, res) => {
 
         await Promise.all(insertQueries);
 
+        // **Step 6: Update sales table to set invoice_generated = true**
+        await pool.query(
+            "UPDATE sales SET invoice_generated = TRUE WHERE id = ANY($1)",
+            [newSales.map(sale=>sale.id)]
+        );
+
         res.status(201).json({ message: "Your invoice has been generated successfully.", invoice_id });
 
     } catch (err) {
@@ -1681,7 +1687,7 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
                         'amount', s.total_amount,
                         'start_date', start_date,
                         'end_date', end_date,
-                        'sale_date',s.sale_date,
+                        'sale_date',TO_CHAR(s.sale_date, 'Mon DD, YYYY'),
                         'created_at', id.created_at
                     )
                 ) AS sale_details
