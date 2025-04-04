@@ -1120,6 +1120,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
                 s.price_per_unit,
                 s.total_amount,
                 s.sale_date,
+                s.invoice_generated,
                 s.created_at,
                 s.created_by,
                 SUM(s.total_amount) OVER () AS total_monthly_expenses
