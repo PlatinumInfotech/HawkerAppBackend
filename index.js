@@ -1691,13 +1691,15 @@ app.post('/view-invoice-detail', verifyToken(['vendor']), async (req, res) => {
                         'sale_date',TO_CHAR(s.sale_date, 'Mon DD, YYYY'),
                         'created_at', id.created_at
                     )
+                    ORDER BY s.sale_date
                 ) AS sale_details
             FROM invoice i
             LEFT JOIN invoice_details id ON i.id = id.invoice_id  
             LEFT JOIN sales s ON id.sale_id = s.id  
             LEFT JOIN products p ON s.product_id = p.id  
             WHERE i.id = $1 AND i.customer_id = $2
-            GROUP BY i.id, i.total_amount;
+            GROUP BY i.id, i.total_amount
+            ORDER BY MIN(s.sale_date); 
         `;
 
         const result = await pool.query(query, [invoice_id, customer_id]);
