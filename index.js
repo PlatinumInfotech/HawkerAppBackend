@@ -1131,7 +1131,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
             JOIN 
                 products p ON s.product_id = p.id
             WHERE 
-                s.customer_id = $1 
+                s.customer_id = $1
                 AND s.vendor_id = $2
                 AND EXTRACT(MONTH FROM s.sale_date) = $3
                 AND EXTRACT(YEAR FROM s.sale_date) = $4
@@ -1145,7 +1145,7 @@ app.post('/sales/customer-monthly', verifyToken(['vendor', 'employee', 'customer
             queryValues.push(productId);
         }
 
-        queryText += ` ORDER BY s.sale_date DESC`;
+        queryText += ` ORDER BY s.sale_date ASC`;
 
         const result = await pool.query({ text: queryText, values: queryValues });
 
@@ -1756,32 +1756,45 @@ app.post('/api/make-payment', verifyToken(['vendor']), async (req, res) => {
         }
 
         // **4. Reject Extra Payment**
-        if (amount > remainingDue) {
-            await client.query('ROLLBACK'); // **Transaction rollback**
-            return res.status(400).json({ 
-                message: "Payment exceeds due amount. Please enter a valid amount.",
-                remaining_due: remainingDue
-            });
-        }
+        // if (amount > remainingDue) {
+        //     await client.query('ROLLBACK'); // **Transaction rollback**
+        //     return res.status(400).json({ 
+        //         message: "Payment exceeds due amount. Please enter a valid amount.",
+        //         remaining_due: remainingDue
+        //     });
+        // }
+
+        let amountToUse = amount; // Initial amount entered by user
 
         if (advancePayment) {
-            // **Advance Payment Case**
-            const advancePaymentQuery = `
-                UPDATE advance_payments
-                SET advance_amount = advance_amount - $1, updated_at = NOW()
-                WHERE customer_id = $2 AND advance_amount >= $1
-                RETURNING id, advance_amount
-            `;
+            const advanceQuery = `SELECT advance_amount from advance_payments where customer_id = $1`;
 
-            const advancePaymentResult = await client.query(advancePaymentQuery, [amount, customer_id]);
+            const advanceResult = await client.query(advanceQuery, [customer_id]);
 
-            // Debugging Log
-            console.log("Advance Payment Query Result:", advancePaymentResult.rows);
+            if(advanceResult.rowCount > 0){
+                let availableAdvance = parseFloat(advanceResult.rows[0].advance_amount);
 
-            // Check if update was successful
-            if (advancePaymentResult.rowCount === 0) {
+                if (availableAdvance <= 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: "Insufficient advance balance" });
+                }
+                
+                    let amountToDeduct = Math.min(amountToUse, availableAdvance);
+
+                    const deductAdvanceQuery = `
+                        UPDATE advance_payments
+                        SET advance_amount = advance_amount - $1, updated_at = NOW()
+                        WHERE customer_id = $2
+                        RETURNING id, advance_amount
+                    `;
+
+                    await client.query(deductAdvanceQuery, [amountToDeduct, customer_id]);
+
+                    amountToUse -= amountToDeduct
+
+            }else {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ message: "Insufficient advance balance" });
+                return res.status(400).json({ message: "No advance balance found for this customer" });
             }
         }
 
