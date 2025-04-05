@@ -356,12 +356,12 @@ app.delete('/vendors/:vendorId', async (req, res) => {
 app.post('/vendors/customers', verifyToken(['vendor']), async (req, res) => {
     const vendorId = parseInt(req.user.id);
     const created_by = req.user.id;
-    const { name, email, mobile, address, status = 'active' } = req.body; // New field
+    const { name, email, mobile, address, status = 'active', customer_unique_id = null } = req.body; // New field
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM create_customer($1, $2, $3, $4, $5, $6, $7)',
-            values: [vendorId, name, email, mobile, address, status, created_by], // Automatically handles new fields
+            text: 'SELECT * FROM create_customer($1, $2, $3, $4, $5, $6, $7, $8)',
+            values: [vendorId, name, email, mobile, address, status, created_by, customer_unique_id], // Automatically handles new fields
         });
         res.status(201).json({
             statusCode: 201,
@@ -418,10 +418,10 @@ app.get('/vendors/:vendorId/customers', verifyToken(['vendor', 'employee']), asy
         const search = req.query.search || ''; // Get search term or default to empty
 
         const result = await pool.query(
-            `SELECT * FROM customers 
+            `SELECT * FROM customers
              WHERE vendor_id = $1 
              AND status='active' 
-             AND (name ILIKE $2 OR mobile ILIKE $2)
+             AND (name ILIKE $2 OR mobile ILIKE $2 OR COALESCE(customer_unique_id, '') ILIKE $2)
              ORDER BY name ASC`,
             [vendorId, `%${search}%`]
         );
@@ -484,12 +484,15 @@ app.get('/vendors/:vendorId/customers', verifyToken(['vendor', 'employee']), asy
 app.put('/vendors/customers/:customerId', verifyToken(['vendor']), async (req, res) => {
     const customerId = parseInt(req.params.customerId);
     const updated_by = parseInt(req.user.id);
-    const { name, email, mobile, address, status } = req.body;
+    let { name, email, mobile, address, status, customer_unique_id } = req.body;
+
+       // ✅ If customer_unique_id is not sent in the request, keep it undefined
+       customer_unique_id = customer_unique_id ? customer_unique_id : null;
 
     try {
         const result = await pool.query({
-            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5, $6, $7)',
-            values: [customerId, name, email, mobile, address, status, updated_by],
+            text: 'SELECT * FROM update_customer($1, $2, $3, $4, $5, $6, $7, $8)',
+            values: [customerId, name, email, mobile, address, status, updated_by, customer_unique_id ],
         });
 
         if (result.rows.length === 0) {
