@@ -1663,8 +1663,7 @@ app.post('/view-invoice', verifyToken(['vendor']), async (req, res) => {
 
         const result = await pool.query(
             `SELECT id, total_amount, status, 
-                    TO_CHAR(start_date, 'Month YYYY') AS month,
-                    SUM(i.total_amount) AS total_invoice_bill_amount
+                    TO_CHAR(start_date, 'Month YYYY') AS month
              FROM invoice i
              WHERE customer_id = $1 
              ORDER BY end_date DESC
