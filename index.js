@@ -740,6 +740,21 @@ app.post('/employees', verifyToken(['vendor']), async (req, res) => {
     const vendor_id = req.user.id;
 
     try {
+
+        //Check if mobile already exists for this vendor
+
+        const existing = await pool.query(
+            `SELECT * FROM employees WHERE vendor_id = $1 AND mobile = $2`
+            [vendor_id, mobile]
+        )
+
+        if(existing.rows.length > 0){
+            return res.status(400).json({
+                statusCode: 400,
+                message: 'Staff with this mobile number already exists for this vendor',
+            });
+        }
+
         const result = await pool.query({
             text: 'SELECT * FROM create_employee($1, $2, $3, $4, $5, $6)',
             values: [vendor_id, name, email, mobile, role, address], // Use lowercase 'values'
@@ -754,7 +769,7 @@ app.post('/employees', verifyToken(['vendor']), async (req, res) => {
         console.error(err);
         res.status(500).json({
             statusCode: 500,
-            message: 'Failed to create employee',
+            message: 'Internal server error',
             error: err.message,
         });
     }
@@ -1648,8 +1663,9 @@ app.post('/view-invoice', verifyToken(['vendor']), async (req, res) => {
 
         const result = await pool.query(
             `SELECT id, total_amount, status, 
-                    TO_CHAR(start_date, 'Month YYYY') AS month 
-             FROM invoice 
+                    TO_CHAR(start_date, 'Month YYYY') AS month,
+                    SUM(i.total_amount) AS total_invoice_bill_amount
+             FROM invoice i
              WHERE customer_id = $1 
              ORDER BY end_date DESC
             `, // Fetch all invoices, sorted by latest
