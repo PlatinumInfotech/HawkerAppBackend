@@ -744,7 +744,7 @@ app.post('/employees', verifyToken(['vendor']), async (req, res) => {
         //Check if mobile already exists for this vendor
 
         const existing = await pool.query(
-            `SELECT * FROM employees WHERE vendor_id = $1 AND mobile = $2`
+            `SELECT * FROM employees WHERE vendor_id = $1 AND mobile = $2`,
             [vendor_id, mobile]
         )
 
